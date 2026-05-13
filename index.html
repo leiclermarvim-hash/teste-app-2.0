@@ -123,9 +123,60 @@
                     <div><label>Projeto ou OSM:</label><input type="text" id="projeto" oninput="this.value = this.value.toUpperCase()"></div>
                     
             <div>
-                <label>Processo:</label>
-                <input type="text" id="processo">
-            </div>
+    <label>Processo:</label>
+    <select id="processo">
+        <option value="">Selecione</option>
+
+        <option>Manutencao Corretiva BT</option>
+        <option>Manutencao Corretiva BT - LV</option>
+        <option>Manutencao Corretiva BT - Subterranea</option>
+        <option>Manutencao Corretiva MT</option>
+        <option>Manutencao Corretiva MT - LV</option>
+        <option>Manutencao Corretiva MT - Subterranea</option>
+        <option>Manutencao Corretiva Submarino</option>
+        <option>Manutencao de Cabine</option>
+        <option>Manutencao Lavagem</option>
+        <option>Manutencao Preventiva BT</option>
+        <option>Manutencao Preventiva BT - LV</option>
+        <option>Manutencao Preventiva BT - Subterranea</option>
+        <option>Manutencao Preventiva Medicao Grafica</option>
+        <option>Manutencao Preventiva MT</option>
+        <option>Manutencao Preventiva MT - LV</option>
+        <option>Manutencao Preventiva MT - Subterranea</option>
+        <option>Manutencao Preventiva Submarino</option>
+        <option>Poda BT - Aereo</option>
+        <option>Poda MT - Aereo</option>
+
+        <option>Projeto Monitor Ramal</option>
+        <option>Projeto MQS - ODD</option>
+        <option>Projeto MQS - ODI</option>
+        <option>Projeto PMC - ODD</option>
+        <option>Projeto PMC - ODI</option>
+        <option>Projeto PQBT - ODD</option>
+        <option>Projeto PQBT - ODI</option>
+
+        <option>Recondutoramento MT - ODD</option>
+        <option>Recondutoramento MT - ODI</option>
+
+        <option>Reposicao de Ativos Corretivo - ODD</option>
+        <option>Reposicao de Ativos Corretivo - ODI</option>
+        <option>Reposicao de Ativos Furto</option>
+        <option>Reposicao de Ativos Preventivo - ODD</option>
+        <option>Reposicao de Ativos Preventivo - ODI</option>
+
+        <option>Telecontrole - ODD</option>
+        <option>Telecontrole - ODI</option>
+
+        <option>Recuperacao de Cabines - ODD</option>
+        <option>Recuperacao de Cabines - ODI</option>
+
+        <option>Reposicao de Ativos Telecontrole ODD</option>
+        <option>Reposicao de Ativos Telecontrole ODI</option>
+
+        <option>Reposicao - Banco Capacitor MT/Regulador MT - ODI</option>
+        <option>Reposicao - Banco Capacitor MT/Regulador MT - ODD</option>
+    </select>
+</div>
                     <div><label>Saída Geral ADM?</label><select id="mat_adm"><option value="Não">Não</option><option value="Sim">Sim</option></select></div>
                 </div>
                 <div style="margin-bottom:12px"><label>Tipo de Movimentação:</label>
@@ -554,9 +605,8 @@
     }
 
     function confirmReset() { if(confirm("Limpar formulário?")) { localStorage.removeItem('fast_request_draft'); location.reload(); } }
-    function exportCSV(index) {
+  function exportCSV(index) {
     const h = historico[index];
-
     if (!h) return;
 
     const ativo = (mov) => {
@@ -567,15 +617,20 @@
     };
 
     const linhas = [];
-    
-    // Cabeçalho CSV
-    linhas.push("codigo;descricao do material;ativo;processo;numero de pedido");
+
+    // NOVO CABEÇALHO
+    linhas.push("codigo;descricao do material;ativo;quantidade;processo;numero de pedido");
 
     h.itens.forEach(item => {
+
+        // converter vírgula para número padrão
+        let qtd = item.qtd.toString().replace(',', '.');
+
         linhas.push([
             item.cod,
             `"${item.desc}"`,
             ativo(h.movim),
+            qtd,
             `"${h.processo || ""}"`,
             `"${h.reserva_num || ""}"`
         ].join(";"));

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gestão de pedidos - V15.5.0</title>
+    <title>Gestão de pedidos - V15.5.2</title>
     <!-- Biblioteca para ler Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -42,7 +42,6 @@
         
         .material-box { border: 2px dashed #cbd5e0; padding: 12px; border-radius: 12px; background: #f1f5f9; position: relative; width: 100%; }
         .btn-add { background: var(--blue-main); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; font-size: 15px; }
-        .btn-add:disabled { background: #ccc; cursor: not-allowed; }
 
         .list-item { display: grid; grid-template-columns: auto 1fr auto 35px; gap: 10px; align-items: center; margin-bottom: 2px; padding: 10px; border-radius: 4px; font-size: 12px; border-bottom: 1px solid #eee; }
         .list-item:nth-child(even) { background-color: var(--zebra); }
@@ -50,8 +49,8 @@
         .history-card { background: #fff; padding: 12px; border-radius: 12px; border: 1px solid #ddd; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; }
         .btn-del-card { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: var(--danger); }
 
-        .hist-table, .base-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
-        .hist-table th, .hist-table td, .base-table th, .base-table td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; }
+        .hist-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        .hist-table th, .hist-table td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; }
 
         .hist-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; }
         .btn-hist { flex: 1; min-width: 70px; padding: 10px 2px; border: none; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: bold; color: white; }
@@ -78,7 +77,7 @@
 
 <div class="app">
     <header>
-        <strong>FAST REQUEST PRO</strong><br><small>Gestão de pedidos | V15.5.0</small>
+        <strong>FAST REQUEST PRO</strong><br><small>Gestão de pedidos | V15.5.2</small>
         <button class="btn-top" onclick="confirmReset()">LIMPAR</button>
     </header>
 
@@ -91,7 +90,6 @@
     <div class="content">
         <div id="page-request" class="page active" oninput="saveDraft()">
             
-            <!-- NOVA FUNCIONALIDADE: CENTRO -->
             <div class="form-section">
                 <span class="section-title">📍 Localização de Estoque</span>
                 <label>Em qual centro quer solicitar materiais?</label>
@@ -130,6 +128,22 @@
                     <div><label>Projeto ou OSM:</label><input type="text" id="projeto" oninput="this.value = this.value.toUpperCase()"></div>
                     <div><label>Saída Geral ADM?</label><select id="mat_adm"><option value="Não">Não</option><option value="Sim">Sim</option></select></div>
                 </div>
+
+                <!-- CAMPO NOVO: OSM / PROGRAMADA -->
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:12px">
+                    <div>
+                        <label>Tipo de Solicitação:</label>
+                        <select id="tipo_osm" onchange="toggleCalendario(); saveDraft()">
+                            <option value="OSM">OSM</option>
+                            <option value="Programada">Programada</option>
+                        </select>
+                    </div>
+                    <div id="campo_calendario" style="display:none">
+                        <label>Para quando?</label>
+                        <input type="date" id="data_programada" oninput="saveDraft()">
+                    </div>
+                </div>
+
                 <div style="margin-bottom:12px"><label>Tipo de Movimentação:</label>
                     <select id="movimentacao">
                         <option value="Z61 - Saída de material">Z61 - Saída de material</option>
@@ -176,7 +190,6 @@
         <div id="page-history" class="page">
             <div style="display:flex; gap:8px; margin-bottom:10px;">
                 <button onclick="window.print()" style="flex:2; padding:12px; background:var(--blue-main); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">🖨️ IMPRIMIR</button>
-                <button onclick="carregarHistoricoDaPlanilha()" style="flex:1; padding:12px; background:var(--accent); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">🔄</button>
             </div>
             <div id="history_list"></div>
         </div>
@@ -197,29 +210,33 @@
 
 <script>
     let db = { users: [], mats: [], mb52_raw: [], centros: [] };
-    let estoqueFiltrado = []; // Estoque somado do centro atual
+    let estoqueFiltrado = [];
     let listaSolicitacao = [];
     let historico = [];
     let centroAtual = "";
 
     const URL_MB52 = "https://raw.githubusercontent.com/leiclermarvim-hash/teste-app-2.0/main/MB52.XLSX";
-    const URL_PLANILHA_GAS = "https://script.google.com/macros/s/AKfycbzymTwXWBHI9l1UXezrjPkTXkLRVS-lVZ1F0h1kgFzwrKykaykT0UNtS1mElYscvNai/exec";    
     const GITHUB_USERS = "https://raw.githubusercontent.com/leiclermarvim-hash/URL_USUARIOS_GITHUB/refs/heads/main/URL_USUARIOS_GITHUB.csv";
     const GITHUB_MATS = "https://raw.githubusercontent.com/leiclermarvim-hash/URL_USUARIOS_GITHUB/refs/heads/main/URL_MATERIAIS_GITHUB.csv";
 
     window.onload = async () => {
-        // Carregar cache
         const h = localStorage.getItem('fast_request_history');
         if(h) historico = JSON.parse(h);
+        
         const cachedDb = localStorage.getItem('fast_request_db');
         if(cachedDb) db = JSON.parse(cachedDb);
         
         await updateBaseFromGithub(true);
-        carregarHistoricoDaPlanilha();
-        validarForm();
+        renderHistory();
+        loadDraft();
     };
 
-    // --- LÓGICA DE CENTRO E EXCEL ---
+    function toggleCalendario() {
+        const tipo = document.getElementById('tipo_osm').value;
+        const divCal = document.getElementById('campo_calendario');
+        divCal.style.display = (tipo === "Programada") ? "block" : "none";
+        if(tipo !== "Programada") document.getElementById('data_programada').value = "";
+    }
 
     async function baixarMB52() {
         try {
@@ -230,7 +247,6 @@
             const json = XLSX.utils.sheet_to_json(firstSheet);
             
             db.mb52_raw = json;
-            // Pegar centros únicos da Coluna C
             db.centros = [...new Set(json.map(item => item["Centro"] || item["centro"] || item["__EMPTY_2"]))].filter(c => c && c !== "Centro");
             
             const select = document.getElementById('sel_centro');
@@ -238,20 +254,13 @@
                 db.centros.map(c => `<option value="${c}">${c}</option>`).join('');
             
         } catch (e) {
-            console.error("Erro ao ler MB52:", e);
             document.getElementById('sel_centro').innerHTML = '<option value="">Erro ao carregar</option>';
         }
     }
 
     function selecionarCentro(centro) {
-        if(!centro) {
-            document.getElementById('mat_busca').disabled = true;
-            document.getElementById('mat_busca').placeholder = "Selecione o centro...";
-            return;
-        }
+        if(!centro) return;
         centroAtual = centro;
-        
-        // Agrupar e Somar Materiais por Centro
         const tempEstoque = {};
         db.mb52_raw.forEach(row => {
             const c = row["Centro"] || row["centro"] || row["__EMPTY_2"];
@@ -259,27 +268,20 @@
                 const cod = String(row["Material"] || row["material"] || row["__EMPTY"]).trim();
                 const qtd = parseFloat(row["Utilização livre"] || row["utilizacao_livre"] || row["__EMPTY_5"] || 0);
                 const desc = row["Texto de material"] || row["texto_material"] || row["__EMPTY_1"] || "";
-
-                if (!tempEstoque[cod]) {
-                    tempEstoque[cod] = { cod, desc, saldo: 0 };
-                }
+                if (!tempEstoque[cod]) tempEstoque[cod] = { cod, desc, saldo: 0 };
                 tempEstoque[cod].saldo += qtd;
             }
         });
-
         estoqueFiltrado = Object.values(tempEstoque);
         document.getElementById('mat_busca').disabled = false;
         document.getElementById('mat_busca').placeholder = "Código ou descrição...";
         saveDraft();
     }
 
-    // --- BUSCA E INTERFACE ---
-
     function searchData(mode) {
         const input = document.getElementById(mode === 'mat' ? 'mat_busca' : mode + '_nome');
         const resDiv = document.getElementById(mode + '_results');
         const t = input.value.toUpperCase();
-        
         if (t.length < 2) { resDiv.style.display = 'none'; return; }
 
         let html = "";
@@ -287,19 +289,15 @@
             const filtrados = estoqueFiltrado.filter(m => m.cod.includes(t) || m.desc.toUpperCase().includes(t));
             html = filtrados.slice(0, 10).map(x => `
                 <div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer;" onclick="selectMaterial('${x.cod}', '${x.desc.replace(/'/g,"")}', ${x.saldo})">
-                    <b>${x.cod}</b> <span class="stock-badge">Qtd: ${x.saldo}</span><br>
-                    <small>${x.desc}</small>
-                </div>
-            `).join('');
+                    <b>${x.cod}</b> <span class="stock-badge">Qtd: ${x.saldo}</span><br><small>${x.desc}</small>
+                </div>`).join('');
         } else {
             const f = db.users.filter(u => u.nome.includes(t));
             html = f.slice(0, 8).map(x => `
                 <div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer;" onclick="selectUser('${mode}','${x.nome}','${x.mat}')">
                     <b>${x.nome}</b><br><small>${x.mat}</small>
-                </div>
-            `).join('');
+                </div>`).join('');
         }
-        
         resDiv.innerHTML = html;
         resDiv.style.display = html ? 'block' : 'none';
     }
@@ -319,8 +317,6 @@
         saveDraft();
     }
 
-    // --- FUNÇÕES DE APOIO ---
-
     function formatQtd(el) {
         let val = el.value.replace(/[^\d.,]/g, '').replace(/\./g, ',');
         const partes = val.split(',');
@@ -332,21 +328,11 @@
         const cod = document.getElementById('mat_busca').value;
         const desc = document.getElementById('mat_desc').innerText;
         const qtd = document.getElementById('mat_qtd').value;
-        const saldoDisp = parseFloat(document.getElementById('mat_saldo').value);
         const itemAdm = document.getElementById('item_is_adm').value;
-
-        if (parseFloat(qtd.replace(',','.')) > saldoDisp) {
-            if(!confirm("Atenção: Quantidade solicitada maior que o saldo no MB52. Deseja continuar?")) return;
-        }
-
         listaSolicitacao.push({ cod, desc, qtd, adm: itemAdm, centro: centroAtual });
-        
-        // Reset campos item
         document.getElementById('mat_busca').value = "";
         document.getElementById('mat_desc').innerText = "Nenhum item selecionado";
-        document.getElementById('mat_saldo').value = "";
         document.getElementById('btn_add_mat').disabled = true;
-        
         renderList();
         saveDraft();
     }
@@ -369,6 +355,7 @@
         document.getElementById('tab-'+t).classList.add('active');
         document.getElementById('page-'+t).classList.add('active');
         document.querySelector('footer').style.display = (t === 'request') ? 'block' : 'none';
+        if(t === 'history') renderHistory();
     }
 
     async function updateBaseFromGithub(silent = false) {
@@ -379,27 +366,16 @@
                 fetch(`${GITHUB_USERS}?t=${timestamp}`), 
                 fetch(`${GITHUB_MATS}?t=${timestamp}`)
             ]);
-            
             const textU = await resU.text();
             const textM = await resM.text();
-            
             db.users = textU.split('\n').slice(1).map(r => {
                 const c = r.split(';');
                 return c.length >= 2 ? { nome: c[0].trim().toUpperCase(), mat: c[1].trim() } : null;
             }).filter(x => x);
-
-            db.mats = textM.split('\n').slice(1).map(r => {
-                const c = r.split(';');
-                return c.length >= 2 ? { cod: c[0].trim(), desc: c[1].trim().toUpperCase() } : null;
-            }).filter(x => x);
-
             await baixarMB52();
-            
             localStorage.setItem('fast_request_db', JSON.stringify(db));
             if(!silent) alert("Bases atualizadas!");
-        } catch (err) {
-            if(!silent) alert("Erro ao atualizar base.");
-        }
+        } catch (err) { if(!silent) alert("Erro ao atualizar base."); }
     }
 
     function toggleCondicionalFields() {
@@ -428,28 +404,68 @@
             centro: document.getElementById('sel_centro').value,
             sol_nome: document.getElementById('sol_nome').value, sol_mat: document.getElementById('sol_mat').value,
             ate_nome: document.getElementById('ate_nome').value, ate_mat: document.getElementById('ate_mat').value,
-            projeto: document.getElementById('projeto').value, itens: listaSolicitacao
+            projeto: document.getElementById('projeto').value,
+            tipo_osm: document.getElementById('tipo_osm').value,
+            data_prog: document.getElementById('data_programada').value,
+            itens: listaSolicitacao
         };
         localStorage.setItem('fast_request_draft', JSON.stringify(d));
         validarForm();
+    }
+
+    function loadDraft() {
+        const draft = localStorage.getItem('fast_request_draft');
+        if(!draft) return;
+        const d = JSON.parse(draft);
+        document.getElementById('sol_nome').value = d.sol_nome || "";
+        document.getElementById('sol_mat').value = d.sol_mat || "";
+        document.getElementById('ate_nome').value = d.ate_nome || "";
+        document.getElementById('ate_mat').value = d.ate_mat || "";
+        document.getElementById('projeto').value = d.projeto || "";
+        document.getElementById('tipo_osm').value = d.tipo_osm || "OSM";
+        document.getElementById('data_programada').value = d.data_prog || "";
+        listaSolicitacao = d.itens || [];
+        toggleCalendario();
+        renderList();
     }
 
     function confirmarPedido() {
         const novo = {
             data: new Date().toLocaleString('pt-BR'),
             projeto: document.getElementById('projeto').value,
-            centro: centroAtual,
+            tipo: document.getElementById('tipo_osm').value,
+            data_exec: document.getElementById('data_programada').value || "Imediata",
             solic: document.getElementById('sol_nome').value,
-            sol_mat: document.getElementById('sol_mat').value,
-            atend: document.getElementById('ate_nome').value,
-            ate_mat: document.getElementById('ate_mat').value,
-            itens: [...listaSolicitacao],
-            status: 'pendente'
+            itens: [...listaSolicitacao]
         };
         historico.unshift(novo);
         localStorage.setItem('fast_request_history', JSON.stringify(historico));
-        alert("Pedido salvo no histórico!");
+        localStorage.removeItem('fast_request_draft');
+        alert("Pedido confirmado!");
         location.reload();
+    }
+
+    function renderHistory() {
+        const container = document.getElementById('history_list');
+        container.innerHTML = historico.map((h, i) => `
+            <div class="history-card">
+                <button class="btn-del-card" onclick="deleteHistory(${i})">✖</button>
+                <strong>PROJETO: ${h.projeto}</strong><br>
+                <small>${h.data} | <b>Tipo:</b> ${h.tipo} | <b>Execução:</b> ${h.data_exec}</small><br>
+                <small>Solicitante: ${h.solic}</small>
+                <table class="hist-table">
+                    <thead><tr><th>Cód</th><th>Desc</th><th>Qtd</th></tr></thead>
+                    <tbody>${h.itens.map(it => `<tr><td>${it.cod}</td><td>${it.desc}</td><td>${it.qtd}</td></tr>`).join('')}</tbody>
+                </table>
+            </div>`).join('');
+    }
+
+    function deleteHistory(i) {
+        if(confirm("Excluir este registro?")) {
+            historico.splice(i, 1);
+            localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            renderHistory();
+        }
     }
 </script>
 

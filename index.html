@@ -176,7 +176,11 @@
             if ((row["Centro"] || row["__EMPTY_2"]) == centro) {
                 const cod = String(row["Material"] || row["__EMPTY"]).trim();
                 const qtd = parseFloat(row["Utilização livre"] || row["__EMPTY_5"] || 0);
-                const desc = row["Texto de material"] || row["__EMPTY_1"] || "";
+                
+                // LIMPEZA DA COLUNA B (Descrição): Remove todos os hifens
+                let descRaw = row["Texto de material"] || row["__EMPTY_1"] || "";
+                const desc = descRaw.replace(/-/g, '').trim(); 
+                
                 if (!temp[cod]) temp[cod] = { cod, desc, saldo: 0 };
                 temp[cod].saldo += qtd;
             }

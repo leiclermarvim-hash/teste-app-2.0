@@ -326,7 +326,7 @@
         executarLogicaGeralAdm();
     };
 
-    function executarLogicaGeralAdm() {
+    function ejecutarLogicaGeralAdm() {
         const IsGeralAdm = document.getElementById('mat_adm').value === "Sim";
         const selectItemAdm = document.getElementById('item_is_adm');
         if (IsGeralAdm) { selectItemAdm.value = "Sim"; selectItemAdm.disabled = true; } 
@@ -432,17 +432,18 @@
 
             let itemExistente = listaSolicitacao.find(x => x.cod === cod);
             if (itemExistente) {
-    let qtdAtual = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
-    let novaQtd = qtdAtual + qtdNum;
-    itemExistente.qtd = novaQtd.toString().replace('.', ',');
-} else {
-    listaSolicitacao.push({
-        cod: cod,         // Alterado: agora recebe o código corretamente
-        desc: descReal,   // Alterado: agora recebe a descrição corretamente
-        qtd: qtdLimpa.replace('.', ','), 
-        adm: itemAdm
-    });
-}
+                let qtdAtual = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
+                let novaQtd = qtdAtual + qtdNum;
+                itemExistente.qtd = novaQtd.toString().replace('.', ',');
+                itemExistente.adm = itemAdm;
+            } else {
+                listaSolicitacao.push({
+                    cod: cod, 
+                    desc: descReal, 
+                    qtd: qtdLimpa.replace('.', ','), 
+                    adm: itemAdm
+                });
+            }
         });
 
         renderList();
@@ -524,7 +525,6 @@
         saveDraft();
     }
 
-    // CORRIGIDO: Parâmetro redundante removido internamente para garantir atribuição limpa
     function selectItem(m, v1, v2, v3) {
         if (m === 'mat') { 
             document.getElementById('mat_busca').value = v1; 
@@ -666,7 +666,7 @@
                 </table>
                 <div class="hist-actions">
                     <button class="btn-hist btn-h-edit" onclick="editarPedido(${i})">Editar</button>
-                    <button class="btn-hist btn-h-planilha" onclick="efetivarPedido(${i}, this)">${h.status === 'efetivado' ? '✅ Sincronizado' : 'Salvar Planilha'}</button>
+                    <button class="btn-hist btn-h-planilha" onclick="efetivarPedido(${idx, this)">${h.status === 'efetivado' ? '✅ Sincronizado' : 'Salvar Planilha'}</button>
                     <button class="btn-hist btn-h-wa" onclick="reutilizarWA(${i})">WhatsApp</button>
                     <button class="btn-hist btn-h-aprovar" onclick="aprovarPedido(${i})">Aprovar</button>
                     <button class="btn-hist btn-h-csv" onclick="exportarParaCSV(${i})">Gerar CSV</button>

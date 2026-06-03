@@ -150,9 +150,9 @@
                     <div><label>Projeto ou OSM:</label><input type="text" id="projeto" oninput="this.value = this.value.toUpperCase()"></div>
                     <div>
                         <label>Tipo de Solicitação:</label>
-                        <select id="tipo_sol_fake">
+                        <select id="tipo_sol_fake" onchange="verificarTipoSolicitacao(); saveDraft();">
                             <option value="">OSM</option>
-                            <option>Programada</option>
+                            <option value="Programada">Programada</option>
                         </select>
                     </div>
                     <div style="grid-column: span 2">
@@ -223,7 +223,7 @@
             <div class="material-box">
                 <span class="section-title">📦 Seleção de Itens</span>
 
-                <div style="margin-bottom: 12px;">
+                <div id="modo_insercao_container" style="margin-bottom: 12px;">
                     <label>Modo de inserção:</label>
                     <select id="is_kit_option" onchange="toggleKitSearch()">
                         <option value="Não">Material Individual</option>
@@ -324,13 +324,32 @@
         updateBaseFromGithub(true); 
         carregarHistoricoDaPlanilha();
         executarLogicaGeralAdm();
+        verificarTipoSolicitacao();
     };
 
-    function ejecutarLogicaGeralAdm() {
+    function verificarTipoSolicitacao() {
+        const tipoSol = document.getElementById('tipo_sol_fake').value;
+        const modoInsercaoContainer = document.getElementById('modo_insercao_container');
+        
+        if (tipoSol === "Programada") {
+            // Esconde a troca de modo de inserção e força a visualização técnica da cascata
+            modoInsercaoContainer.style.display = 'none';
+            document.getElementById('is_kit_option').value = "Sim";
+            toggleKitSearch();
+        } else {
+            modoInsercaoContainer.style.display = 'block';
+            document.getElementById('is_kit_option').value = "Não";
+            toggleKitSearch();
+        }
+    }
+
+    function executarLogicaGeralAdm() {
         const IsGeralAdm = document.getElementById('mat_adm').value === "Sim";
         const selectItemAdm = document.getElementById('item_is_adm');
-        if (IsGeralAdm) { selectItemAdm.value = "Sim"; selectItemAdm.disabled = true; } 
-        else { selectItemAdm.disabled = false; }
+        if (selectItemAdm) {
+            if (IsGeralAdm) { selectItemAdm.value = "Sim"; selectItemAdm.disabled = true; } 
+            else { selectItemAdm.disabled = false; }
+        }
         saveDraft();
     }
 
@@ -418,15 +437,24 @@
         }
 
         const itemAdm = document.getElementById('mat_adm').value;
+        const tipoSol = document.getElementById('tipo_sol_fake').value;
 
         materiaisDoKit.forEach(it => {
             const cod = it.matCod ? it.matCod.replace(/\r|\n/g, '').trim() : "";
             if (!cod) return;
 
-            const materialOficial = db.mats.find(m => m.cod === cod);
-            let descReal = materialOficial ? materialOficial.desc : (it.matDescOriginal || "MATERIAL TÉCNICO");
-            descReal = descReal.replace(/\r|\n/g, '').trim();
+            let descReal = "";
             
+            // LÓGICA ATUALIZADA: Se for Programada, busca o texto breve ("desc") no arquivo MB52 cruzando o código
+            if (tipoSol === "Programada") {
+                const materialNoMB52 = db.mb52.find(m => m.cod === cod);
+                descReal = materialNoMB52 && materialNoMB52.desc ? materialNoMB52.desc : (it.matDescOriginal || "MATERIAL PROGRAMADO");
+            } else {
+                const materialOficial = db.mats.find(m => m.cod === cod);
+                descReal = materialOficial ? materialOficial.desc : (it.matDescOriginal || "MATERIAL TÉCNICO");
+            }
+            
+            descReal = descReal.replace(/\r|\n/g, '').trim();
             const qtdLimpa = it.matQtd ? it.matQtd.replace(/\r|\n/g, '').trim() : "1";
             const qtdNum = parseFloat(qtdLimpa.replace(',', '.')) || 1;
 
@@ -437,8 +465,8 @@
                 itemExistente.qtd = novaQtd.toString().replace('.', ',');
             } else {
                 listaSolicitacao.push({
-                    cod: descReal, 
-                    desc: cod, 
+                    cod: cod, 
+                    desc: descReal, 
                     qtd: qtdLimpa.replace('.', ','), 
                     adm: itemAdm
                 });
@@ -480,7 +508,7 @@
             projeto: document.getElementById('projeto').value, reserva: document.getElementById('reserva').value,
             processo: document.getElementById('processo').value, centro_selecionado: document.getElementById('centro_selecionado').value,
             centro_busca: document.getElementById('centro_busca').value, itens: listaSolicitacao,
-            movimentacao: document.getElementById('movimentacao').value
+            movimentacao: document.getElementById('movimentacao').value, tipo_sol: document.getElementById('tipo_sol_fake').value
         };
         localStorage.setItem('fast_request_draft', JSON.stringify(d));
         validarForm();
@@ -686,10 +714,12 @@
         document.getElementById('reserva_num').value = pedido.reserva_num || "";
         document.getElementById('id_fluxo').value = pedido.id_fluxo || "";
         document.getElementById('mat_adm').value = pedido.mat_adm || "Não";
+        document.getElementById('tipo_sol_fake').value = pedido.tipo_sol || "";
         
         listaSolicitacao = [...pedido.itens];
         renderList();
         executarLogicaGeralAdm();
+        verificarTipoSolicitacao();
         switchTab('request');
         alert("Pedido carregado com sucesso na aba NOVO!");
     }
@@ -698,7 +728,6 @@
         alert(`Pedido do projeto "${historico[i].projeto}" marcado como APROVADO localmente!`);
     }
 
-    // RESOLVIDO: GERAÇÃO DE CSV USANDO UM BLOB UNIFORME COM SEPARADORES POR PONTO E VÍRGULA EM TODAS AS LINHAS
     function exportarParaCSV(i) {
         const pedido = historico[i];
         if(!pedido.itens || pedido.itens.length === 0) return alert("Nenhum item para exportar.");
@@ -713,7 +742,6 @@
 
         const numPedido = pedido.reserva_num ? pedido.reserva_num.trim() : "";
 
-        // Montagem estruturada do CSV usando estritamente ponto e vírgula
         let csvRows = [];
         csvRows.push("Codigo do material;descricao do material;Ativo;quantidade reservada;processo;Nº Pedido");
 
@@ -726,7 +754,6 @@
             csvRows.push(`${cod};${desc};${ativoValor};${qtd};${proc};${numPedido}`);
         });
 
-        // Junta as linhas com quebra de linha uniforme e adiciona o BOM do UTF-8 para o Excel reconhecer o delimitador
         const csvString = csvRows.join("\n");
         const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
         
@@ -766,7 +793,12 @@
             
             db.users = textU.split('\n').slice(1).map(r => { const c = r.split(';'); return c.length >= 2 ? { nome: c[0].trim().toUpperCase(), mat: c[1].trim() } : null; }).filter(x => x);
             db.mats = textM.split('\n').slice(1).map(r => { const c = r.split(';'); return c.length >= 2 ? { cod: c[0].trim(), desc: c[1].trim().toUpperCase() } : null; }).filter(x => x);
-            db.mb52 = textMB.split('\n').slice(1).map(r => { const c = r.split(';'); return c.length >= 7 ? { cod: c[0].trim(), centro: c[3].trim(), qtd: c[6].trim() } : null; }).filter(x => x);
+            
+            // MODIFICADO: Mapeamento do arquivo MB52 alterado para capturar a coluna B (descrição curta) no índice [1]
+            db.mb52 = textMB.split('\n').slice(1).map(r => { 
+                const c = r.split(';'); 
+                return c.length >= 7 ? { cod: c[0].trim(), desc: c[1] ? c[1].trim().toUpperCase() : "", centro: c[3].trim(), qtd: c[6].trim() } : null; 
+            }).filter(x => x);
 
             db.kitBase = textK.split('\n').slice(1).map(l => {
                 const c = l.split(';'); if(c.length < 13) return null;
@@ -782,7 +814,7 @@
 
             localStorage.setItem('fast_request_db', JSON.stringify(db));
             renderUsersTable();
-            if(!silent) alert("Bases atualizadas com sucesso!");
+            if(!silent) alert("Bases updated successfully!");
         } catch (err) { console.error(err); }
     }
 
@@ -798,11 +830,14 @@
             document.getElementById('centro_selecionado').value = d.centro_selecionado;
             document.getElementById('centro_busca').value = d.centro_busca || d.centro_selecionado;
         }
+        if (d.tipo_sol) {
+            document.getElementById('tipo_sol_fake').value = d.tipo_sol;
+        }
         if (d.itens) { listaSolicitacao = d.itens; renderList(); }
     }
 
     function deleteCard(i) { if(confirm("Excluir pedido do histórico?")) { historico.splice(i,1); localStorage.setItem('fast_request_history', JSON.stringify(historico)); renderHistory(); } }
-    function confirmReset() { if(confirm("Limpar tudo?")) { localStorage.removeItem('fast_request_draft'); location.reload(); } }
+    function confirmReset() { if(confirm("Limpar tudo?")) { localStorage.removeItem('fast_request_draft'); localStorage.removeItem('fast_request_history'); location.reload(); } }
 </script>
 </body>
 </html>

@@ -326,7 +326,7 @@
         executarLogicaGeralAdm();
     };
 
-    function ejecutarLogicaGeralAdm() {
+    function executarLogicaGeralAdm() {
         const IsGeralAdm = document.getElementById('mat_adm').value === "Sim";
         const selectItemAdm = document.getElementById('item_is_adm');
         if (IsGeralAdm) { selectItemAdm.value = "Sim"; selectItemAdm.disabled = true; } 
@@ -408,7 +408,7 @@
         );
 
         if (materiaisDoKit.length === 0) {
-            alert("Nenhum material associado a essa combinação técnica.");
+            alert("Nenhum material associado a essa combination técnica.");
             return;
         }
 
@@ -435,7 +435,6 @@
                 let qtdAtual = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
                 let novaQtd = qtdAtual + qtdNum;
                 itemExistente.qtd = novaQtd.toString().replace('.', ',');
-                itemExistente.adm = itemAdm;
             } else {
                 listaSolicitacao.push({
                     cod: cod, 
@@ -666,7 +665,7 @@
                 </table>
                 <div class="hist-actions">
                     <button class="btn-hist btn-h-edit" onclick="editarPedido(${i})">Editar</button>
-                    <button class="btn-hist btn-h-planilha" onclick="efetivarPedido(${idx, this)">${h.status === 'efetivado' ? '✅ Sincronizado' : 'Salvar Planilha'}</button>
+                    <button class="btn-hist btn-h-planilha" onclick="efetivarPedido(${i}, this)">${h.status === 'efetivado' ? '✅ Sincronizado' : 'Salvar Planilha'}</button>
                     <button class="btn-hist btn-h-wa" onclick="reutilizarWA(${i})">WhatsApp</button>
                     <button class="btn-hist btn-h-aprovar" onclick="aprovarPedido(${i})">Aprovar</button>
                     <button class="btn-hist btn-h-csv" onclick="exportarParaCSV(${i})">Gerar CSV</button>
@@ -780,7 +779,7 @@
 
             localStorage.setItem('fast_request_db', JSON.stringify(db));
             renderUsersTable();
-            if(!silent) alert("Bases updated successfully!");
+            if(!silent) alert("Bases updated com sucesso!");
         } catch (err) { console.error(err); }
     }
 

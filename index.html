@@ -432,18 +432,17 @@
 
             let itemExistente = listaSolicitacao.find(x => x.cod === cod);
             if (itemExistente) {
-                let qtdAtual = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
-                let novaQtd = qtdAtual + qtdNum;
-                itemExistente.qtd = novaQtd.toString().replace('.', ',');
-            } else {
-                // CORRIGIDO: cod recebe cod e desc recebe descReal (Estava invertido)
-                listaSolicitacao.push({
-                    cod: cod, 
-                    desc: descReal, 
-                    qtd: qtdLimpa.replace('.', ','), 
-                    adm: itemAdm
-                });
-            }
+    let qtdAtual = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
+    let novaQtd = qtdAtual + qtdNum;
+    itemExistente.qtd = novaQtd.toString().replace('.', ',');
+} else {
+    listaSolicitacao.push({
+        cod: cod,         // Alterado: agora recebe o código corretamente
+        desc: descReal,   // Alterado: agora recebe a descrição corretamente
+        qtd: qtdLimpa.replace('.', ','), 
+        adm: itemAdm
+    });
+}
         });
 
         renderList();

@@ -326,7 +326,7 @@
         executarLogicaGeralAdm();
     };
 
-    function executarLogicaGeralAdm() {
+    function ejecutarLogicaGeralAdm() {
         const IsGeralAdm = document.getElementById('mat_adm').value === "Sim";
         const selectItemAdm = document.getElementById('item_is_adm');
         if (IsGeralAdm) { selectItemAdm.value = "Sim"; selectItemAdm.disabled = true; } 
@@ -389,7 +389,7 @@
         }
     }
 
-    function adicionarKitCascata() {
+   function adicionarKitCascata() {
         const sel = {
             est: document.getElementById('c_est').value,
             red: document.getElementById('c_red').value,
@@ -408,7 +408,7 @@
         );
 
         if (materiaisDoKit.length === 0) {
-            alert("Nenhum material associado a essa combination técnica.");
+            alert("Nenhum material associado a essa combinação técnica.");
             return;
         }
 
@@ -436,9 +436,10 @@
                 let novaQtd = qtdAtual + qtdNum;
                 itemExistente.qtd = novaQtd.toString().replace('.', ',');
             } else {
+                // CORRIGIDO: cod recebe o código numérico e desc recebe a descrição textual
                 listaSolicitacao.push({
-                    cod: cod, 
-                    desc: descReal, 
+                    cod: descReal,
+                    desc: cod, 
                     qtd: qtdLimpa.replace('.', ','), 
                     adm: itemAdm
                 });
@@ -560,7 +561,7 @@
             itemExistente.qtd = somaQtd.toString().replace('.', ',');
             itemExistente.adm = itemAdm;
         } else {
-            listaSolicitacao.push({ cod, desc: descFinal, qtd: qtdRaw, adm: itemAdm });
+            listaSolicitacao.push({ cod: cod, desc: descFinal, qtd: qtdRaw, adm: itemAdm });
         }
         
         document.getElementById('mat_busca').value = "";
@@ -573,19 +574,35 @@
     function renderList() {
         const centroAtivo = document.getElementById('centro_selecionado').value;
         document.getElementById('lista_ui').innerHTML = listaSolicitacao.map((item, i) => {
-            let saldoTexto = "---"; let corSaldo = "#666";
+            let saldoTexto = "---"; 
+            let corSaldo = "#666";
+            let descMB52 = item.desc; 
+
             if (centroAtivo) {
                 const estoqueObj = db.mb52.find(x => x.cod === item.cod && x.centro === centroAtivo);
                 if (estoqueObj) {
                     saldoTexto = estoqueObj.qtd;
                     corSaldo = parseFloat(estoqueObj.qtd.replace(',', '.')) > 0 ? '#21a366' : 'var(--danger)';
-                } else { saldoTexto = "0"; corSaldo = 'var(--danger)'; }
+                    
+                    // Altera a descrição estática do item pela descrição atualizada do MB52 se encontrada
+                    if (estoqueObj.desc) {
+                        descMB52 = estoqueObj.desc.toUpperCase();
+                    }
+                } else { 
+                    saldoTexto = "0"; 
+                    corSaldo = 'var(--danger)'; 
+                }
             }
+            
             return `
             <div class="list-item">
-                <div class="list-text-wrapper">
+                <div class="list-text-wrapper" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                     <span class="item-code">${item.cod}</span>
-                    <span class="item-desc">${item.desc}${item.adm === 'Sim' ? ' <small style="color:var(--danger); font-weight:bold;">(ADM)</small>' : ''}</span>
+                    
+                    <span class="item-desc">
+                        ${descMB52}${item.adm === 'Sim' ? ' <small style="color:var(--danger); font-weight:bold;">(ADM)</small>' : ''}
+                    </span>
+                    
                     <div class="item-qty-wrapper">
                         <span class="item-qty">Ped: <b>${item.qtd}</b></span>
                         <span class="item-qty" style="color:${corSaldo}; min-width: 55px; text-align: left; padding-left: 4px;">Disp: <b>${saldoTexto}</b></span>
@@ -756,30 +773,40 @@
         window.open(`https://wa.me/?text=${texto}`, '_blank');
     }
 
-    async function updateBaseFromGithub(silent = false) {
+   async function updateBaseFromGithub(silent = false) {
         try {
             const [resU, resM, resMB, resK] = await Promise.all([fetch(GITHUB_USERS), fetch(GITHUB_MATS), fetch(GITHUB_MB52), fetch(GITHUB_KITS)]);
             const textU = await resU.text(), textM = await resM.text(), textMB = await resMB.text(), textK = await resK.text();
             
+            // 1. Mapeamento de Usuários
             db.users = textU.split('\n').slice(1).map(r => { const c = r.split(';'); return c.length >= 2 ? { nome: c[0].trim().toUpperCase(), mat: c[1].trim() } : null; }).filter(x => x);
+            
+            // 2. Mapeamento de Materiais Geral
             db.mats = textM.split('\n').slice(1).map(r => { const c = r.split(';'); return c.length >= 2 ? { cod: c[0].trim(), desc: c[1].trim().toUpperCase() } : null; }).filter(x => x);
-            db.mb52 = textMB.split('\n').slice(1).map(r => { const c = r.split(';'); return c.length >= 7 ? { cod: c[0].trim(), centro: c[3].trim(), qtd: c[6].trim() } : null; }).filter(x => x);
+            
+            // 3. Mapeamento do MB52 (Estoque Disponível)
+            db.mb52 = textMB.split('\n').slice(1).map(r => { 
+                const c = r.split(';'); 
+                // c[0] = Código, c[1] = Descrição, c[3] = Centro, c[6] = Coluna G (Quantidade Disponível)
+                return c.length >= 7 ? { cod: c[0].trim(), desc: c[1]?.trim(), centro: c[3].trim(), qtd: c[6].trim() } : null; 
+            }).filter(x => x);
 
-            db.kitBase = textK.split('\n').slice(1).map(l => {
-                const c = l.split(';'); if(c.length < 13) return null;
+            // 4. Mapeamento do Kit de Materiais
+          db.kitBase = textK.split('\n').slice(1).map(l => {
+                const c = l.split(';'); if(c.length < 12) return null; // Valida até a Coluna L
                 let descLimpa = c[9]?.trim().toUpperCase() || ""; descLimpa = descLimpa.replace(/MO/g, 'MAO').replace(/[^A-Z0-9\s,.\-\/()]/gi, '');
                 return { 
                     est: c[2]?.trim(), red: c[3]?.trim(), pos: c[4]?.trim(), niv: c[5]?.trim(), alt: c[6]?.trim(), dan: c[7]?.trim(), cab: c[8]?.trim(), 
                     matDescOriginal: descLimpa, 
                     matCod: c[10]?.trim() ? c[10].replace(/\r|\n/g, '').trim() : "", 
-                    matQtd: c[12]?.trim() ? c[12].replace(/\r|\n/g, '').trim() : "1", 
+                    matQtd: c[11]?.trim() ? c[11].replace(/\r|\n/g, '').trim() : "1", // AJUSTADO PARA COLUNA L (índice 11)
                     codigoKit: c[c.length - 1]?.trim() ? c[c.length - 1].replace(/\r|\n/g, '').trim() : "" 
                 };
             }).filter(x => x && x.est && x.matCod);
 
             localStorage.setItem('fast_request_db', JSON.stringify(db));
             renderUsersTable();
-            if(!silent) alert("Bases updated com sucesso!");
+            if(!silent) alert("Bases atualizadas com sucesso!");
         } catch (err) { console.error(err); }
     }
 

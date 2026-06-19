@@ -1391,7 +1391,45 @@
             throw new Error("Aplicação violada. Execução interrompida.");
         }
     }, 2500); // Executa a checagem a cada 2,5 segundos
-});
+});async function carregarHistoricoDaPlanilha() {
+    const loadingDiv = document.getElementById('loading_hist');
+    if (loadingDiv) loadingDiv.style.display = 'block';
+
+    const centro = document.getElementById('centro_selecionado')?.value || '';
+    
+    // Constrói a URL com o parâmetro de ação e o centro logado (se houver)
+    const url = `${URL_PLANILHA_GAS}?action=getHistory&centro=${encodeURIComponent(centro)}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Erro na requisição: ${response.status}`);
+        }
+
+        const dados = await response.json();
+
+        if (Array.isArray(dados)) {
+            // Salva no LocalStorage para acesso offline rápido posterior
+            localStorage.setItem('fast_request_history', JSON.stringify(dados));
+            
+            // Atualiza a variável global do app
+            historico = dados;
+            
+            // Renderiza novamente a tela do histórico com os dados novos
+            if (typeof renderHistory === 'function') {
+                renderHistory();
+            }
+            console.log('Histórico atualizado com sucesso da nuvem!');
+        } else {
+            console.error('O retorno da planilha não é um array válido:', dados);
+        }
+    } catch (error) {
+        console.error('Erro ao buscar histórico da nuvem:', error);
+        alert('Não foi possível sincronizar com a nuvem. Exibindo dados locais anteriores.');
+    } finally {
+        if (loadingDiv) loadingDiv.style.display = 'none';
+    }
+}
 </script>
 </body>
 </html>

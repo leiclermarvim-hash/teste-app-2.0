@@ -1392,6 +1392,14 @@
         }
     }, 2500); // Executa a checagem a cada 2,5 segundos
 });async function carregarHistoricoDaPlanilha() {
+        // ... dentro da função renderHistory, onde você faz o loop pelos pedidos ...
+const badgeSincronizado = pedido.sincronizado 
+    ? `<span style="background: #e6f4ea; color: #137333; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">
+        ☁️ Sincronizado
+       </span>` 
+    : `<span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">
+        📱 Local (Pendente)
+       </span>`;
     const loadingDiv = document.getElementById('loading_hist');
     if (loadingDiv) loadingDiv.style.display = 'block';
 

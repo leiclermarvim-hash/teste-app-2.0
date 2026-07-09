@@ -328,6 +328,7 @@
     let db = { users: [], mats: [], mb52: [], kitBase: [] };
     let listaSolicitacao = [];
     let historico = [];
+    let pedidoEmEdicaoId = "";
 
     const URL_PLANILHA_GAS = "https://script.google.com/macros/s/AKfycbyMf8c9nO5U8lGTNugL2Ma4jjlJgtjd8Ij3hGHAmP3kzpoYaOYBVpUedowHJgrQdzmx/exec";    
     const GITHUB_USERS = "https://raw.githubusercontent.com/leiclermarvim-hash/teste-app-2.0/refs/heads/main/URL_USUARIOS_GITHUB.csv";
@@ -488,14 +489,14 @@
         const itemAdm = document.getElementById('mat_adm').value;
 
         materiaisDoKit.forEach(it => {
-            const cod = it.matCod ? it.matCod.replace(/\r|\n/g, '').trim() : "";
+            const cod = it.matCod ? it.matCod.replace(/[\r\n]/g, '').trim() : "";
             if (!cod) return;
 
             const materialOficial = db.mats.find(m => m.cod === cod);
             let descReal = materialOficial ? materialOficial.desc : (it.matDescOriginal || "MATERIAL TÉCNICO");
-            descReal = descReal.replace(/\r|\n/g, '').trim();
+            descReal = descReal.replace(/[\r\n]/g, '').trim();
             
-            const qtdLimpa = it.matQtd ? it.matQtd.replace(/\r|\n/g, '').trim() : "1";
+            const qtdLimpa = it.matQtd ? it.matQtd.replace(/[\r\n]/g, '').trim() : "1";
 
             let itemExistente = listaSolicitacao.find(x => x.cod === cod);
             if (itemExistente) {
@@ -767,31 +768,124 @@
         btn.disabled = !ok; btn.classList.toggle('active', ok);
     }
 
+
+    function gerarIdPedidoAutomatico() {
+        const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let tentativas = 0;
+        let novoId = '';
+
+        do {
+            let prefixo = '';
+            for (let i = 0; i < 4; i++) {
+                prefixo += letras.charAt(Math.floor(Math.random() * letras.length));
+            }
+            const numero = Math.floor(1000 + Math.random() * 9000).toString();
+            novoId = prefixo + numero;
+            tentativas++;
+        } while ((historico || []).some(h => String(h.idPedido || h.id || '') === novoId) && tentativas < 30);
+
+        return novoId;
+    }
+
+    function normalizarPedidoId(pedido) {
+        if (!pedido) return pedido;
+
+        const idFluxo = String(pedido.id_fluxo || '').trim();
+        let idAtual = String(pedido.idPedido || pedido.id || '').trim();
+        const idValido = /^[A-Z]{4}\d{4}$/.test(idAtual);
+        const idRepetiuFluxo = idFluxo && idAtual && idAtual === idFluxo;
+
+        // Guarda o identificador antigo da planilha para permitir excluir registros antigos,
+        // inclusive versões que usavam o ID do fluxo como ID do pedido.
+        if (idAtual && (!idValido || idRepetiuFluxo)) {
+            pedido.idPedidoOnlineOriginal = idAtual;
+        }
+
+        if (!idValido || idRepetiuFluxo) {
+            idAtual = gerarIdPedidoAutomatico();
+        }
+
+        pedido.id = idAtual;
+        pedido.idPedido = idAtual;
+        return pedido;
+    }
+
+    function obterIdOnlineParaExcluir(pedido) {
+        if (!pedido) return '';
+        return String(
+            pedido.idPedidoOnlineOriginal ||
+            pedido.idOnlineOriginal ||
+            pedido.idPedido ||
+            pedido.id ||
+            pedido.id_fluxo ||
+            ''
+        ).trim();
+    }
+
+    async function excluirPedidoOnlineSilencioso(idPedido) {
+        if (!idPedido) return true;
+
+        try {
+            const response = await fetch(URL_PLANILHA_GAS, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'deletarPedido',
+                    idPedido: idPedido
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result || result.status !== 'success') {
+                throw new Error((result && result.message) ? result.message : 'Falha ao excluir pedido na planilha.');
+            }
+
+            return true;
+        } catch (error) {
+            console.error(error);
+            alert('Não foi possível excluir o pedido on-line para edição: ' + error.message + '\n\nO pedido não foi carregado para edição para evitar duplicidade.');
+            return false;
+        }
+    }
+
     function confirmarPedido() {
         if(!confirm("Salvar pedido?")) return;
+
         const agora = new Date();
-        const novo = { 
+        const idPedidoGerado = pedidoEmEdicaoId || gerarIdPedidoAutomatico();
+
+        let novo = {
+            id: idPedidoGerado,
+            idPedido: idPedidoGerado,
             data: agora.toLocaleDateString('pt-BR'),
             hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            projeto: document.getElementById('projeto').value.toUpperCase(), 
-            solic: document.getElementById('sol_nome').value, 
-            sol_mat: document.getElementById('sol_mat').value, 
-            atend: document.getElementById('ate_nome').value, 
+            projeto: document.getElementById('projeto').value.toUpperCase(),
+            solic: document.getElementById('sol_nome').value,
+            sol_mat: document.getElementById('sol_mat').value,
+            atend: document.getElementById('ate_nome').value,
             atend_mat: document.getElementById('ate_mat').value,
-            processo: document.getElementById('processo').value, 
+            processo: document.getElementById('processo').value,
             movim: document.getElementById('movimentacao').value,
-            reserva_num: document.getElementById('reserva_num').value, 
+            reserva_num: document.getElementById('reserva_num').value,
             id_fluxo: document.getElementById('id_fluxo').value,
-            mat_adm: document.getElementById('mat_adm').value, 
-            centro: document.getElementById('centro_selecionado').value, 
+            mat_adm: document.getElementById('mat_adm').value,
+            centro: document.getElementById('centro_selecionado').value,
             tipo_sol: document.getElementById('tipo_sol_fake').value,
             data_exec_programada: document.getElementById('tipo_sol_fake').value === "Programada" ? document.getElementById('data_programada').value : "",
-            itens: [...listaSolicitacao], 
-            status: 'pendente' 
+            itens: [...listaSolicitacao],
+            status: 'pendente'
         };
+
+        novo = normalizarPedidoId(novo);
         historico.unshift(novo);
         localStorage.setItem('fast_request_history', JSON.stringify(historico));
-        listaSolicitacao = []; renderList(); switchTab('history');
+
+        pedidoEmEdicaoId = "";
+        listaSolicitacao = [];
+        renderList();
+        switchTab('history');
     }
 
     async function carregarHistoricoDaPlanilha() {
@@ -870,7 +964,7 @@
                 return true;
             });
 
-            historico = [...pendentesLocais, ...historicoAgrupado];
+            historico = [...pendentesLocais, ...historicoAgrupado].map(h => normalizarPedidoId(h));
             localStorage.setItem('fast_request_history', JSON.stringify(historico));
             
             renderHistory();
@@ -899,7 +993,8 @@
         
         const centroAtivo = document.getElementById('centro_selecionado').value;
 
-        let listaFiltrada = (historico || []);
+        historico = (historico || []).map(h => normalizarPedidoId(h));
+        let listaFiltrada = historico;
         if (centroAtivo) {
             listaFiltrada = listaFiltrada.filter(h => h && h.centro === centroAtivo);
             if(titFiltro) titFiltro.innerText = `🔍 Filtro de Buscas — Centro ${centroAtivo}`;
@@ -1003,36 +1098,58 @@
         }).join('');
     }
 
-    function acaoEditarEExcluirDoHistorico(i) {
-        if(historico[i] && confirm("Deseja extrair este pedido para a aba NOVO?\n\nIsso removerá ele do histórico temporariamente para edições.")) {
-            const pedido = historico[i];
-            
-            document.getElementById('projeto').value = pedido.projeto || "";
-            document.getElementById('sol_nome').value = pedido.solic || "";
-            document.getElementById('sol_mat').value = pedido.sol_mat || "";
-            document.getElementById('ate_nome').value = pedido.atend || "";
-            document.getElementById('ate_mat').value = pedido.atend_mat || "";
-            document.getElementById('processo').value = pedido.processo || "";
-            document.getElementById('movimentacao').value = pedido.movim || "Z61 - Saída de material";
-            document.getElementById('reserva_num').value = pedido.reserva_num || "";
-            document.getElementById('id_fluxo').value = pedido.id_fluxo || "";
-            document.getElementById('mat_adm').value = pedido.mat_adm || "Não";
-            document.getElementById('centro_selecionado').value = pedido.centro || "";
-            document.getElementById('centro_busca').value = pedido.centro || "";
-            
-            document.getElementById('tipo_sol_fake').value = pedido.tipo_sol || "OSM";
-            document.getElementById('data_programada').value = pedido.data_exec_programada || "";
-            
-            listaSolicitacao = [...(pedido.itens || [])];
-            
-            historico.splice(i, 1);
-            localStorage.setItem('fast_request_history', JSON.stringify(historico));
-            
-            toggleCalendarioProgramada();
-            renderList();
-            executarLogicaGeralAdm();
-            switchTab('request');
+    async function acaoEditarEExcluirDoHistorico(i) {
+        if (!historico[i]) return;
+
+        const pedido = normalizarPedidoId(historico[i]);
+        const idPedidoTela = pedido.idPedido || pedido.id || "";
+        const idParaExcluirOnline = obterIdOnlineParaExcluir(pedido);
+        const projeto = pedido.projeto || "---";
+
+        const mensagem = `Deseja editar este pedido?
+
+ID Pedido: ${idPedidoTela || '---'}
+Projeto/OSM: ${projeto}
+
+Ao clicar em OK, o sistema tentará excluir o pedido da planilha on-line e carregará os dados na aba NOVO para edição.
+
+Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidade.`;
+        if (!confirm(mensagem)) return;
+
+        if (idParaExcluirOnline) {
+            const excluiuOnline = await excluirPedidoOnlineSilencioso(idParaExcluirOnline);
+            if (!excluiuOnline) return;
         }
+
+        pedidoEmEdicaoId = idPedidoTela || gerarIdPedidoAutomatico();
+
+        document.getElementById('projeto').value = pedido.projeto || "";
+        document.getElementById('sol_nome').value = pedido.solic || "";
+        document.getElementById('sol_mat').value = pedido.sol_mat || "";
+        document.getElementById('ate_nome').value = pedido.atend || "";
+        document.getElementById('ate_mat').value = pedido.atend_mat || "";
+        document.getElementById('processo').value = pedido.processo || "";
+        document.getElementById('movimentacao').value = pedido.movim || "Z61 - Saída de material";
+        document.getElementById('reserva_num').value = pedido.reserva_num || "";
+        document.getElementById('id_fluxo').value = pedido.id_fluxo || "";
+        document.getElementById('mat_adm').value = pedido.mat_adm || "Não";
+        document.getElementById('centro_selecionado').value = pedido.centro || "";
+        document.getElementById('centro_busca').value = pedido.centro || "";
+        document.getElementById('tipo_sol_fake').value = pedido.tipo_sol || "OSM";
+        document.getElementById('data_programada').value = pedido.data_exec_programada || "";
+
+        document.getElementById('reserva').value = (pedido.reserva_num || pedido.id_fluxo) ? "Sim" : "Não";
+        listaSolicitacao = [...(pedido.itens || [])];
+
+        historico.splice(i, 1);
+        localStorage.setItem('fast_request_history', JSON.stringify(historico));
+
+        toggleCondicionalFields();
+        toggleCalendarioProgramada();
+        renderList();
+        executarLogicaGeralAdm();
+        validarForm();
+        switchTab('request');
     }
 
     function exportarParaCSV(i) {
@@ -1050,10 +1167,10 @@
         csvRows.push("Codigo do material;descricao do material;Ativo;quantidade reservada;processo;Nº Pedido");
 
         pedido.itens.forEach(it => {
-            const cod = it.cod ? it.cod.replace(/\r|\n/g, '').trim() : "";
-            const desc = it.desc ? it.desc.replace(/;/g, ' ').replace(/\r|\n/g, '').trim() : "";
-            const qtd = it.qtd ? it.qtd.replace(/\r|\n/g, '').trim() : "1";
-            const proc = pedido.processo ? pedido.processo.replace(/;/g, ' ').replace(/\r|\n/g, '').trim() : "";
+            const cod = it.cod ? it.cod.replace(/[\r\n]/g, '').trim() : "";
+            const desc = it.desc ? it.desc.replace(/;/g, ' ').replace(/[\r\n]/g, '').trim() : "";
+            const qtd = it.qtd ? it.qtd.replace(/[\r\n]/g, '').trim() : "1";
+            const proc = pedido.processo ? pedido.processo.replace(/;/g, ' ').replace(/[\r\n]/g, '').trim() : "";
             
             csvRows.push(`${cod};${desc};${ativoValor};${qtd};${proc};${numPedido}`);
         });
@@ -1071,26 +1188,30 @@
 
     async function efetivarPedido(indexReal, btnEl) {
         let pedidoParaEnviar;
-        
+
         if (indexReal !== undefined && indexReal !== null && historico[indexReal]) {
             pedidoParaEnviar = JSON.parse(JSON.stringify(historico[indexReal]));
         } else {
             if (listaSolicitacao.length === 0) { alert("Nenhum item na lista!"); return; }
             const agora = new Date();
+            const idPedidoGerado = pedidoEmEdicaoId || gerarIdPedidoAutomatico();
+
             pedidoParaEnviar = {
+                id: idPedidoGerado,
+                idPedido: idPedidoGerado,
                 data: agora.toLocaleDateString('pt-BR'),
                 hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                projeto: document.getElementById('projeto').value.toUpperCase(), 
-                solic: document.getElementById('sol_nome').value, 
-                sol_mat: document.getElementById('sol_mat').value, 
-                atend: document.getElementById('ate_nome').value, 
+                projeto: document.getElementById('projeto').value.toUpperCase(),
+                solic: document.getElementById('sol_nome').value,
+                sol_mat: document.getElementById('sol_mat').value,
+                atend: document.getElementById('ate_nome').value,
                 atend_mat: document.getElementById('ate_mat').value,
-                processo: document.getElementById('processo').value, 
+                processo: document.getElementById('processo').value,
                 movim: document.getElementById('movimentacao').value,
-                reserva_num: document.getElementById('reserva_num').value, 
+                reserva_num: document.getElementById('reserva_num').value,
                 id_fluxo: document.getElementById('id_fluxo').value,
-                mat_adm: document.getElementById('mat_adm').value, 
-                centro: document.getElementById('centro_selecionado').value, 
+                mat_adm: document.getElementById('mat_adm').value,
+                centro: document.getElementById('centro_selecionado').value,
                 tipo_sol: document.getElementById('tipo_sol_fake').value,
                 data_exec_programada: document.getElementById('tipo_sol_fake').value === "Programada" ? document.getElementById('data_programada').value : "",
                 status: 'pendente',
@@ -1098,14 +1219,16 @@
             };
         }
 
-        const btn = btnEl || document.getElementById('btn_enviar'); 
+        pedidoParaEnviar = normalizarPedidoId(pedidoParaEnviar);
+
+        const btn = btnEl || document.getElementById('btn_enviar');
         if(btn) { btn.disabled = true; btn.innerText = "Enviando..."; }
 
         pedidoParaEnviar.itens = pedidoParaEnviar.itens.map(i => {
-            let qtdTratada = i.qtd ? String(i.qtd).replace(/\r|\n/g, '').trim() : "1";
+            let qtdTratada = i.qtd ? String(i.qtd).replace(/[\r\n]/g, '').trim() : "1";
             return {
-                cod: i.cod ? String(i.cod).replace(/\r|\n/g, '').trim() : "",
-                desc: i.desc ? String(i.desc).replace(/\r|\n/g, '').trim() : "",
+                cod: i.cod ? String(i.cod).replace(/[\r\n]/g, '').trim() : "",
+                desc: i.desc ? String(i.desc).replace(/[\r\n]/g, '').trim() : "",
                 qtd: qtdTratada,
                 adm: i.adm || "Não"
             };
@@ -1128,23 +1251,18 @@
                 throw new Error((result && result.message) ? result.message : 'Falha ao salvar pedido na planilha.');
             }
 
-            if (result.idPedido) {
-                pedidoParaEnviar.id = result.idPedido;
-                pedidoParaEnviar.idPedido = result.idPedido;
-            }
+            // Mantém o ID gerado no aplicativo. Não sobrescreve com retorno do Apps Script.
+            pedidoParaEnviar = normalizarPedidoId(pedidoParaEnviar);
+            pedidoParaEnviar.status = 'efetivado';
 
             if (indexReal !== undefined && indexReal !== null && historico[indexReal]) {
-                historico[indexReal].status = 'efetivado';
-                if (result.idPedido) {
-                    historico[indexReal].id = result.idPedido;
-                    historico[indexReal].idPedido = result.idPedido;
-                }
+                historico[indexReal] = pedidoParaEnviar;
             } else {
-                pedidoParaEnviar.status = 'efetivado';
                 historico.unshift(pedidoParaEnviar);
                 listaSolicitacao = [];
             }
-            
+
+            pedidoEmEdicaoId = "";
             localStorage.setItem('fast_request_history', JSON.stringify(historico));
             alert("Pedido sincronizado com sucesso!");
             renderList();
@@ -1152,16 +1270,18 @@
         } catch (e) {
             console.error(e);
             alert(`Mantido em cache local. Falha ao enviar.`);
+
             if (indexReal === undefined || indexReal === null) {
                 pedidoParaEnviar.status = 'pendente';
                 historico.unshift(pedidoParaEnviar);
                 localStorage.setItem('fast_request_history', JSON.stringify(historico));
             }
+
             renderHistory();
         } finally {
-            if(btn && (!pedidoParaEnviar || pedidoParaEnviar.status !== 'efetivado')) { 
-                btn.disabled = false; 
-                btn.innerText = "Salvar Planilha"; 
+            if(btn && (!pedidoParaEnviar || pedidoParaEnviar.status !== 'efetivado')) {
+                btn.disabled = false;
+                btn.innerText = "Salvar Planilha";
             }
         }
     }
@@ -1170,7 +1290,7 @@
         const pedido = historico[i];
         if (!pedido) return;
 
-        const idPedido = pedido.id || pedido.idPedido || "";
+        const idPedido = obterIdOnlineParaExcluir(pedido);
         const projeto = pedido.projeto || "---";
         const mensagem = idPedido
             ? `Confirma excluir o pedido ${idPedido} do histórico e da planilha on-line?\n\nProjeto/OSM: ${projeto}`
@@ -1326,8 +1446,8 @@
                 descLimpa = descLimpa.replace(/MO/g, 'MAO').replace(/[^A-Z0-9\s,.\-\/()]/gi, '');
                 return { 
                     est: c[2]?.trim(), red: c[3]?.trim(), pos: c[4]?.trim(), niv: c[5]?.trim(), alt: c[6]?.trim(), dan: c[7]?.trim(), cab: c[8]?.trim(), 
-                    matDescOriginal: descLimpa, matCod: c[9]?.trim() ? c[9].replace(/\r|\n/g, '').trim() : "", matQtd: c[11]?.trim() ? c[11].replace(/\r|\n/g, '').trim() : "1",
-                    codigoKit: c[c.length - 1]?.trim() ? c[c.length - 1].replace(/\r|\n/g, '').trim() : "" 
+                    matDescOriginal: descLimpa, matCod: c[9]?.trim() ? c[9].replace(/[\r\n]/g, '').trim() : "", matQtd: c[11]?.trim() ? c[11].replace(/[\r\n]/g, '').trim() : "1",
+                    codigoKit: c[c.length - 1]?.trim() ? c[c.length - 1].replace(/[\r\n]/g, '').trim() : "" 
                 };
             }).filter(x => x && x.est && x.matCod);
 
@@ -1480,11 +1600,12 @@
         const dados = await response.json();
 
         if (Array.isArray(dados)) {
+            const dadosNormalizados = dados.map(h => normalizarPedidoId(h));
             // Salva no LocalStorage para acesso offline rápido posterior
-            localStorage.setItem('fast_request_history', JSON.stringify(dados));
+            localStorage.setItem('fast_request_history', JSON.stringify(dadosNormalizados));
             
             // Atualiza a variável global do app
-            historico = dados;
+            historico = dadosNormalizados;
             
             // Renderiza novamente a tela do histórico com os dados novos
             if (typeof renderHistory === 'function') {

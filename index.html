@@ -1,4 +1,4 @@
-<!DOCTYPE1 html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -78,7 +78,8 @@
         .btn-h-planilha { background: var(--blue-main) !important; }
         .btn-h-wa { background: #25D366 !important; } 
         .btn-h-email { background: #0078d4 !important; }
-        .btn-h-csv { background: #333333 !important; }
+        .btn-h-csv { background: #333333 !important; grid-column: span 2;}
+        .btn-h-delete { background: var(--danger) !important; grid-column: span 2; }
 
         footer { padding: 10px 15px; background: #fff; border-top: 1px solid #eee; text-align: center; flex-shrink: 0; }
         .btn-confirm { background: #ccc; color: #fff; border: none; padding: 16px; width: 100%; font-weight: 800; border-radius: 12px; cursor: not-allowed; font-size: 16px; }
@@ -956,6 +957,7 @@
                     return `
                     <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fafafa;">
                         <div class="hist-meta-box">
+                            <div><b>ID Pedido:</b> ${h.id || h.idPedido || '---'}</div>
                             <div><b>Centro Operacional:</b> Centro ${h.centro || '---'}</div>
                             <div><b>Emissão:</b> ${h.data} às ${h.hora || '--:--'}</div>
                             <div><b>Tipo de Solicitação:</b> ${h.tipo_sol || 'OSM'} ${solDataExec}</div>
@@ -991,7 +993,8 @@
                             <button class="btn-hist btn-h-planilha" ${btnDisabled} onclick="efetivarPedido(${indexReal}, this)">${btnLabel}</button>
                             <button class="btn-hist btn-h-wa" onclick="reutilizarWA(${indexReal})">WhatsApp</button>
                             <button class="btn-hist btn-h-email" onclick="direcionarParaEmail(${indexReal})">📧 E-mail</button>
-                           <button class="btn-hist btn-h-csv" onclick="exportarParaCSV(${indexReal})" style="grid-column: span 2;">💾 Gerar CSV</button>
+                           <button class="btn-hist btn-h-csv" onclick="exportarParaCSV(${indexReal})">💾 Gerar CSV</button>
+                           <button class="btn-hist btn-h-delete" onclick="deletarPedidoOnline(${indexReal})">🗑️ Excluir pedido</button>
                         </div>
                     </div>
                     `;
@@ -1109,15 +1112,33 @@
         });
 
         try {
-            await fetch(URL_PLANILHA_GAS, {
+            const response = await fetch(URL_PLANILHA_GAS, {
                 method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pedidoParaEnviar)
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'salvarPedido',
+                    dados: pedidoParaEnviar
+                })
             });
+
+            const result = await response.json();
+
+            if (!result || result.status !== 'success') {
+                throw new Error((result && result.message) ? result.message : 'Falha ao salvar pedido na planilha.');
+            }
+
+            if (result.idPedido) {
+                pedidoParaEnviar.id = result.idPedido;
+                pedidoParaEnviar.idPedido = result.idPedido;
+            }
 
             if (indexReal !== undefined && indexReal !== null && historico[indexReal]) {
                 historico[indexReal].status = 'efetivado';
+                if (result.idPedido) {
+                    historico[indexReal].id = result.idPedido;
+                    historico[indexReal].idPedido = result.idPedido;
+                }
             } else {
                 pedidoParaEnviar.status = 'efetivado';
                 historico.unshift(pedidoParaEnviar);
@@ -1145,6 +1166,51 @@
         }
     }
 
+    async function deletarPedidoOnline(i) {
+        const pedido = historico[i];
+        if (!pedido) return;
+
+        const idPedido = pedido.id || pedido.idPedido || "";
+        const projeto = pedido.projeto || "---";
+        const mensagem = idPedido
+            ? `Confirma excluir o pedido ${idPedido} do histórico e da planilha on-line?\n\nProjeto/OSM: ${projeto}`
+            : `Este pedido ainda não possui ID on-line. Deseja remover apenas do histórico local?\n\nProjeto/OSM: ${projeto}`;
+
+        if (!confirm(mensagem)) return;
+
+        if (!idPedido) {
+            historico.splice(i, 1);
+            localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            renderHistory();
+            return;
+        }
+
+        try {
+            const response = await fetch(URL_PLANILHA_GAS, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'deletarPedido',
+                    idPedido: idPedido
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result || result.status !== 'success') {
+                throw new Error((result && result.message) ? result.message : 'Falha ao excluir pedido na planilha.');
+            }
+
+            historico.splice(i, 1);
+            localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            renderHistory();
+            alert(result.message || 'Pedido excluído com sucesso.');
+        } catch (error) {
+            console.error(error);
+            alert('Não foi possível excluir o pedido na planilha on-line: ' + error.message);
+        }
+    }
     function reutilizarWA(i) {
         const h = historico[i]; 
         if (!h || !h.itens || h.itens.length === 0) return;
@@ -1189,34 +1255,36 @@
             ? h.data_exec_programada.split('-').reverse().join('/') 
             : '---';
 
-        const assunto = `Solicitação de Materiais - Projeto/OSM: ${h.projeto || '---'} (Centro ${h.centro || '---'})`;
-        
-        let corpoEmail = `Prezados,\n\nSegue abaixo o escopo detalhado da nova solicitação de materiais realizada via app:\n\n`;
-        corpoEmail += `==================================================\n`;
+	const mesmoSolicitanteEAtendente =
+   		 String(h.sol_mat || '').trim() !== '' &&
+   		 String(h.atend_mat || '').trim() !== '' &&
+   		 String(h.sol_mat || '').trim() === String(h.atend_mat || '').trim();
+
+        const assunto = `Projeto: ${h.projeto || '---'} / Reserva: ${h.reserva_num || '---'} / Processo: ${h.processo}`;        
+        let corpoEmail = `Prezados,\nSegue abaixo o escopo detalhado da nova solicitação:\n\n`;
+	corpoEmail += `Solicitante: ${h.solic || '---'} (Matrícula: ${h.sol_mat || '---'})\n`;
+      		 if (!mesmoSolicitanteEAtendente) {
+   			 corpoEmail += `Atendente: ${h.atend || '---'} (Matrícula: ${h.atend_mat || '---'})\n`;}
+	corpoEmail += `Data Emissão: ${h.data || '---'} às ${h.hora || '--:--'}\n`;
         corpoEmail += `PROJETO / OSM: ${h.projeto || '---'}\n`;
-        corpoEmail += `Centro Operacional: Centro ${h.centro || '---'}\n`;
-        corpoEmail += `Data Emissão: ${h.data || '---'} às ${h.hora || '--:--'}\n`;
-        corpoEmail += `Tipo de Solicitação: ${h.tipo_sol || 'OSM'}\n`;
-        if (h.tipo_sol === "Programada") {
-            corpoEmail += `Data Execução Programada: ${dataProgFormatada}\n`;
-        }
-        corpoEmail += `Solicitante: ${h.solic || '---'} (Matrícula: ${h.sol_mat || '---'})\n`;
-        corpoEmail += `Atendente: ${h.atend || '---'} (Matrícula: ${h.atend_mat || '---'})\n`;
-        corpoEmail += `Processo: ${h.processo || '---'}\n`;
-        corpoEmail += `Movimentação: ${h.movim || '---'}\n`;
-        corpoEmail += `Nº Reserva: ${h.reserva_num || '---'}\n`;
+	corpoEmail += `Nº Reserva: ${h.reserva_num || '---'}\n`;
         if (h.id_fluxo) corpoEmail += `ID do Fluxo: ${h.id_fluxo}\n`;
-        corpoEmail += `Saída Geral ADM: ${h.mat_adm || 'Não'}\n`;
-        corpoEmail += `==================================================\n\n`;
-        
-        corpoEmail += `ITENS SOLICITADOS:\n`;
-        
+	corpoEmail += `Tipo de Solicitação: ${h.tipo_sol || 'OSM'}\n`;
+	corpoEmail += `Centro Operacional: Centro ${h.centro || '---'}\n`;
+	corpoEmail += `Processo: ${h.processo || '---'}\n`;
+	
+	corpoEmail += `Movimentação: ${h.movim || '---'}\n`;
+        if (h.tipo_sol === "Programada") {corpoEmail += `Data de Execução Programada: ${dataProgFormatada}\n`;}
+          
+        corpoEmail += `\n\nITENS SOLICITADOS:\n`;
+        corpoEmail += `CODIGO - DESCRICAO - QUANTIDADE\n`;
+
         // Formato identico ao do WhatsApp
         h.itens.forEach(m => {
             corpoEmail += `${m.cod} - ${m.desc}${m.adm === 'Sim' ? ' *(ADM)*' : ''} - ${m.qtd}\n`;
         });
         
-        corpoEmail += `\nAtenciosamente,\nGestão de Pedidos Fast Request Pro.`;
+        corpoEmail += `\nAtenciosamente,\n${h.solic || '---'}.`;
 
         // Pergunta ao usuário qual versão do Outlook ele deseja usar
         const usarAplicativo = confirm("Deseja abrir no Aplicativo do Outlook?\n\n(Clique em 'Cancelar' para abrir o Outlook Web)");

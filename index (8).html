@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestão de pedidos - V15.07.2</title>
+    <style>
+        :root { 
+            --blue-dark: #001a33; 
+            --blue-main: #003366; 
+            --accent: #21a366; 
+            --danger: #d9534f;
+            --bg: #e9ecef; 
+            --card: #ffffff; 
+            --text: #333;
+            --zebra: #f1f5f9;
+        }
+
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 10px; display: flex; justify-content: center; color: var(--text); overflow-x: hidden; }
+        .app { background: var(--card); width: 100%; max-width: 500px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); overflow: hidden; display: flex; flex-direction: column; height: 96vh; position: relative; border: 1px solid #ddd; }
+
+        header { background: var(--blue-dark); color: white; padding: 20px; text-align: center; flex-shrink: 0; border-bottom: 4px solid var(--accent); position: relative; }
+        .btn-top { background: var(--danger); color: white; border: none; padding: 10px 18px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: bold; position: absolute; right: 10px; top: 20px; }
+
+        .tabs { display: flex; background: #f8f9fa; border-bottom: 1px solid #dee2e6; flex-shrink: 0; }
+        .tab { flex: 1; padding: 15px 5px; text-align: center; cursor: pointer; font-weight: 700; font-size: 12px; color: #6c757d; text-transform: uppercase; }
+        .tab.active { color: var(--blue-main); border-bottom: 3px solid var(--blue-main); background: #fff; }
+
+        .content { padding: 12px; overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        .page { display: none; flex-direction: column; gap: 12px; width: 100%; }
+        .page.active { display: flex; }
+
+        .form-section { background: #fcfcfc; border: 1px solid #eee; border-radius: 12px; padding: 12px; width: 100%; }
+        .section-title { font-size: 11px; color: #888; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; display: block; }
+
+        label { font-weight: 700; font-size: 13px; color: var(--blue-main); display: block; margin-bottom: 4px; }
+        input, select { padding: 12px; border: 1px solid #ced4da; border-radius: 10px; width: 100%; font-size: 16px; background: white; color: var(--text); }
+        select:disabled { background: #e9ecef; color: #6c757d; cursor: not-allowed; }
+
+        .material-box { border: 2px dashed #cbd5e0; padding: 12px; border-radius: 12px; background: #f1f5f9; position: relative; width: 100%; }
+        .btn-add { background: var(--blue-main); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; font-size: 15px; }
+        .btn-add:disabled { background: #ccc; cursor: not-allowed; }
+
+        .cascata-group { background: #fff; padding: 10px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .cascata-group label { font-size: 11px; color: #666; margin-bottom: 0; }
+        .cascata-group select { padding: 8px; font-size: 14px; }
+
+        .switch-container { display: flex; align-items: center; gap: 10px; margin: 10px 0; background: #fff; padding: 8px; border-radius: 8px; border: 1px solid #ddd; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        .list-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid #eee; background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06); gap: 10px; }
+        .list-item:nth-child(even), .hist-table tr:nth-child(even), .base-table tr:nth-child(even) { background-color: var(--zebra); }
+        
+        .list-text-wrapper { display: flex; align-items: center; flex: 1; min-width: 0; font-size: 13px; color: #333; gap: 8px; }
+        .item-code { font-weight: bold; width: 65px; flex-shrink: 0; color: #000; font-size: 13px; }
+        .item-desc { flex: 1; min-width: 0; padding-right: 5px; white-space: normal; word-break: break-word; line-height: 1.3; color: #444; font-size: 12px; }
+        .item-qty-wrapper { display: flex; flex-direction: row; gap: 6px; flex-shrink: 0; align-items: center; justify-content: flex-end; font-size: 13px; }
+        .item-qty { font-weight: normal; color: #000; white-space: nowrap; }
+        .inp-inline-qty { width: 45px; padding: 5px; text-align: center; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; font-weight: bold; }
+
+        .history-card { background: #fff; padding: 12px; border-radius: 12px; border: 1px solid #ddd; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; display: block; }
+        .hist-meta-box { background: #f8f9fa; border-left: 4px solid var(--blue-main); padding: 8px; font-size: 12px; margin-bottom: 8px; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; gap: 3px; }
+
+        .hist-table, .base-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        .hist-table th, .hist-table td, .base-table th, .base-table td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; }
+
+        .hist-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; width: 100%; }
+
+        .btn-hist { padding: 10px 4px; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; color: white; text-align: center; display: inline-block; }
+        .btn-hist:disabled { background: #bbb !important; color: #777 !important; cursor: not-allowed; }
+        .btn-h-edit { background: #f0ad4e !important; }
+        .btn-h-planilha { background: var(--blue-main) !important; }
+        .btn-h-wa { background: #25D366 !important; } 
+        .btn-h-email { background: #0078d4 !important; }
+        .btn-h-csv { background: #333333 !important; grid-column: span 2;}
+        .btn-h-delete { background: var(--danger) !important; grid-column: span 2; }
+
+        footer { padding: 10px 15px; background: #fff; border-top: 1px solid #eee; text-align: center; flex-shrink: 0; }
+        .btn-confirm { background: #ccc; color: #fff; border: none; padding: 16px; width: 100%; font-weight: 800; border-radius: 12px; cursor: not-allowed; font-size: 16px; }
+        .btn-confirm.active { background: var(--accent); cursor: pointer; }
+
+        .search-results { position: absolute; background: white; width: 100%; left: 0; z-index: 999; border: 1px solid #ccc; display: none; max-height: 200px; overflow-y: auto; border-radius: 10px; }
+        .condicional-fields { display: none; flex-direction: column; gap: 8px; margin-top: 12px; border-left: 3px solid var(--blue-main); padding-left: 10px; }
+        
+        .filter-section { display: flex; flex-direction: column; gap: 8px; background: #f1f3f5; padding: 10px; border-radius: 10px; margin-bottom: 12px; }
+        .filter-controls { display: flex; gap: 6px; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <header>
+        <strong>FAST REQUEST PRO</strong><br><small>Gestão de pedidos | V15.07.2</small>
+        <button class="btn-top" onclick="confirmReset()">LIMPAR</button>
+    </header>
+
+    <div class="tabs">
+        <div id="tab-request" class="tab active" onclick="switchTab('request')">📋 NOVO</div>
+        <div id="tab-history" class="tab" onclick="switchTab('history')">📂 HISTÓRICO</div>
+        <div id="tab-config" class="tab" onclick="switchTab('config')">⚙️ BASE</div>
+    </div>
+
+    <div class="content">
+        <div id="page-request" class="page active" oninput="saveDraft()">
+            
+            <div class="form-section">
+                <span class="section-title">📍 Centro Operacional</span>
+                <div style="margin-bottom:4px">
+                    <label>Centro (Coluna D):</label>
+                    <div style="position:relative">
+                        <input type="text" id="centro_busca" placeholder="Filtrar Centro..." onkeyup="searchData('centro')" autocomplete="off">
+                        <div id="centro_results" class="search-results"></div>
+                    </div>
+                    <input type="hidden" id="centro_selecionado">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <span class="section-title">👤 Identificação</span>
+                <div style="margin-bottom:12px">
+                    <label>Solicitante:</label>
+                    <div style="display:flex; gap:5px">
+                        <div style="flex:3; position:relative">
+                            <input type="text" id="sol_nome" placeholder="Buscar..." onkeyup="searchData('sol')" autocomplete="off">
+                            <div id="sol_results" class="search-results"></div>
+                        </div>
+                        <input type="text" id="sol_mat" readonly placeholder="Mat." style="flex:1.2; background:#f1f3f5; text-align:center;">
+                    </div>
+                </div>
+                <div>
+                    <label>Atendente:</label>
+                    <div style="display:flex; gap:5px">
+                        <div style="flex:3; position:relative">
+                            <input type="text" id="ate_nome" placeholder="Buscar..." onkeyup="searchData('ate')" autocomplete="off">
+                            <div id="ate_results" class="search-results"></div>
+                        </div>
+                        <input type="text" id="ate_mat" readonly placeholder="Mat." style="flex:1.2; background:#f1f3f5; text-align:center;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <span class="section-title">🚧 Dados do Pedido</span>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:12px">
+                    <div><label>Projeto ou OSM:</label><input type="text" id="projeto" oninput="this.value = this.value.toUpperCase()"></div>
+                    <div>
+                        <label>Tipo de Solicitação:</label>
+                        <select id="tipo_sol_fake" onchange="toggleCalendarioProgramada(); saveDraft()">
+                            <option value="OSM">OSM</option>
+                            <option value="Programada">Programada</option>
+                            <option value="Emergencia">Emergencial</option>
+                        </select>
+                    </div>
+                    <div style="grid-column: span 2; display:none;" id="div_data_programada">
+                        <label>Data de Execução da Programada:</label>
+                        <input type="date" id="data_programada">
+                    </div>
+                    <div style="grid-column: span 2">
+                        <label>Processo:</label>
+                        <select id="processo">
+                            <option value="">Selecione</option>
+                            <option>Manutencao Corretiva BT</option>
+                            <option>Manutencao Corretiva BT - LV</option>
+                            <option>Manutencao Corretiva BT - Subterranea</option>
+                            <option>Manutencao Corretiva MT</option>
+                            <option>Manutencao Corretiva MT - LV</option>
+                            <option>Manutencao Corretiva MT - Subterranea</option>
+                            <option>Manutencao Corretiva Submarino</option>
+                            <option>Manutencao de Cabine</option>
+                            <option>Manutencao Lavagem</option>
+                            <option>Manutencao Preventiva BT</option>
+                            <option>Manutencao Preventiva BT - LV</option>
+                            <option>Manutencao Preventiva BT - Subterranea</option>
+                            <option>Manutencao Preventiva Medicao Grafica</option>
+                            <option>Manutencao Preventiva MT</option>
+                            <option>Manutencao Preventiva MT - LV</option>
+                            <option>Manutencao Preventiva MT - Subterranea</option>
+                            <option>Manutencao Preventiva Submarino</option>
+                            <option>Poda BT - Aereo</option>
+                            <option>Poda MT - Aereo</option>
+                            <option>Projeto Monitor Ramal</option>
+                            <option>Projeto MQS - ODD</option>
+                            <option>Projeto MQS - ODI</option>
+                            <option>Projeto PMC - ODD</option>
+                            <option>Projeto PMC - ODI</option>
+                            <option>Projeto PQBT - ODD</option>
+                            <option>Projeto PQBT - ODI</option>
+                            <option>Recondutoramento MT - ODD</option>
+                            <option>Recondutoramento MT - ODI</option>
+                            <option>Reposicao de Ativos Corretivo - ODD</option>
+                            <option>Reposicao de Ativos Corretivo - ODI</option>
+                            <option>Reposicao de Ativos Furto</option>
+                            <option>Reposicao de Ativos Preventivo - ODD</option>
+                            <option>Reposicao de Ativos Preventivo - ODI</option>
+                            <option>Telecontrole - ODD</option>
+                            <option>Telecontrole - ODI</option>
+                            <option>Recuperacao de Cabines - ODD</option>
+                            <option>Recuperacao de Cabines - ODI</option>
+                            <option>Reposicao de Ativos Telecontrole ODD</option>
+                            <option>Reposicao de Ativos Telecontrole ODI</option>
+                            <option>Reposicao - Banco Capacitor MT/Regulador MT - ODI</option>
+                            <option>Reposicao - Banco Capacitor MT/Regulador MT - ODD</option>
+                            <option> Emergência</option>
+                            <option> Troca de Ramal</option>
+                            <option> Atendimento a clientes - DDM</option>
+                        </select>
+                    </div>
+                    <div><label>Saída Geral ADM?</label><select id="mat_adm" onchange="executarLogicaGeralAdm()"><option value="Não">Não</option><option value="Sim">Sim</option></select></div>
+                </div>
+                <div style="margin-bottom:12px"><label>Tipo de Movimentação:</label>
+                    <select id="movimentacao">
+                        <option value="Z61 - Saída de material">Z61 - Saída de material</option>
+                        <option value="Estorno de material">Estorno de material</option>
+                        <option value="Z6D - Devolução de sucata">Z6D - Devolução de sucata</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:12px"><label>Deseja informar a reserva?</label>
+                    <select id="reserva" onchange="toggleCondicionalFields(); saveDraft()"><option value="Não">Não</option><option value="Sim">Sim</option></select>
+                </div>
+                <div id="campos_condicionais" class="condicional-fields">
+                    <div><label>ID do fluxo:</label><input type="text" id="id_fluxo"></div>
+                    <div><label>Reserva:</label><input type="text" id="reserva_num"></div>
+                </div>
+            </div>
+
+            <div class="material-box">
+                <span class="section-title">📦 Seleção de Itens</span>
+
+                <div style="margin-bottom: 12px;">
+                    <label>Modo de inserção:</label>
+                    <select id="is_kit_option" onchange="toggleKitSearch()">
+                        <option value="Não">Material Individual</option>
+                        <option value="Sim">Kit por Cascata Técnica</option>
+                    </select>
+                </div>
+
+                <div id="kit_cascata_div" style="display:none; margin-bottom: 15px;">
+                    <div class="cascata-group">
+                        <label>1. Estrutura (C):</label><select id="c_est" onchange="filtrarCascata(1)"></select>
+                        <label>2. Rede (D):</label><select id="c_red" onchange="filtrarCascata(2)" disabled></select>
+                        <label>3. Tipo Poste (E):</label><select id="c_pos" onchange="filtrarCascata(3)" disabled></select>
+                        <label>4. Nível (F):</label><select id="c_niv" onchange="filtrarCascata(4)" disabled></select>
+                        <label>5. Altura Poste (G):</label><select id="c_alt" onchange="filtrarCascata(5)" disabled></select>
+                        <label>6. Dan (H):</label><select id="c_dan" onchange="filtrarCascata(6)" disabled></select>
+                        <label>7. Tipo Cabo (I):</label><select id="c_cab" onchange="filtrarCascata(7)" disabled></select>
+                    </div>
+                    <button id="btn_add_kit" class="btn-add" style="background:var(--accent); display:none" onclick="adicionarKitCascata()">INSERIR MATERIAIS DO KIT</button>
+                </div>
+
+                <div id="manual_search_div">
+                    <label>Busque o material abaixo:</label>
+                    <div style="position:relative"><input type="text" id="mat_busca" placeholder="Código ou descrição..." onkeyup="searchData('mat')" autocomplete="off"><div id="mat_results" class="search-results"></div></div>
+                    <div id="mat_desc" style="font-size:14px; color:#000; margin:8px 0; font-weight:bold; line-height:1.2;">Nenhum item selecionado</div>
+
+                    <div class="switch-container">
+                        <span style="font-size: 13px; font-weight: bold; color: var(--blue-main);">É transformador?</span>
+                        <label class="switch"><input type="checkbox" id="is_trafo" onchange="toggleTrafoField()"><span class="slider"></span></label>
+                        <div id="trafo_input_div" style="display:none; flex:1"><input type="number" id="trafo_serie" placeholder="Nº do Patrimônio"></div>
+                    </div>
+
+                    <div style="display:flex; gap:8px; align-items:flex-end">
+                        <div style="flex:1"><label>QTD:</label><input type="text" id="mat_qtd" value="1" oninput="formatQtd(this)"></div>
+                        <button id="btn_add_mat" class="btn-add" style="flex:1.5" onclick="addItem()" disabled>ADICIONAR</button>
+                    </div>
+                </div>
+            </div>
+            <div id="lista_ui" style="margin-top: 10px; display: flex; flex-direction: column; gap: 4px;"></div>
+        </div>
+
+        <div id="page-history" class="page">
+            <div class="filter-section">
+                <span class="section-title" id="titulo_filtro_busca">🔍 Filtro de Buscas</span>
+                <div class="filter-controls">
+                    <select id="filtro_tipo" style="flex: 1;" onchange="alternarCampoFiltro()">
+                        <option value="projeto">Projeto / OSM</option>
+                        <option value="reserva">Nº Reserva</option>
+                        <option value="data">Filtrar por Data</option>
+                    </select>
+                    <input type="text" id="filtro_valor" style="flex: 1.5;" placeholder="Digite o termo..." onkeyup="renderHistory()">
+                    <input type="date" id="filtro_data" style="flex: 1.5; display: none;" onchange="renderHistory()">
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <button onclick="carregarHistoricoDaPlanilha()" style="width:100%; padding:12px; background:var(--accent); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">🔄 ATUALIZAR HISTÓRICO</button>
+            </div>
+            <div id="loading_hist" style="display:none; text-align:center; padding:10px; color:var(--blue-main); font-weight:bold;">Sincronizando...</div>
+            <div id="history_list"></div>
+        </div>
+
+        <div id="page-config" class="page">
+            <div class="form-section">
+                <span class="section-title" id="base_title">📊 Base de Dados - Materiais</span>
+                <div style="max-height: 250px; overflow-y: auto; margin-bottom: 20px;">
+                    <table class="base-table" id="table-mats">
+                        <thead style="position: sticky; top: 0; background: var(--blue-main); color: white;">
+                            <tr><th>CÓDIGO</th><th>DESCRIÇÃO DO MATERIAL</th><th>QTD DISP.</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <span class="section-title" id="base_users_title">👥 Base de Dados - Usuários do Centro</span>
+                <div style="max-height: 250px; overflow-y: auto;">
+                    <table class="base-table" id="table-users">
+                        <thead style="position: sticky; top: 0; background: var(--blue-main); color: white;">
+                            <tr><th>MATRÍCULA</th><th>NOME DO COLABORADOR</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <button id="btn_confirm" class="btn-confirm" onclick="confirmarPedido()">CONFIRMAR</button>
+    </footer>
+</div>
+
+<script>
+    let db = { users: [], mats: [], mb52: [], kitBase: [] };
+    let listaSolicitacao = [];
+    let historico = [];
+    let pedidoEmEdicaoId = "";
+
+    const URL_PLANILHA_GAS = "https://script.google.com/macros/s/AKfycbyMf8c9nO5U8lGTNugL2Ma4jjlJgtjd8Ij3hGHAmP3kzpoYaOYBVpUedowHJgrQdzmx/exec";    
+    const GITHUB_USERS = "https://raw.githubusercontent.com/leiclermarvim-hash/teste-app-2.0/refs/heads/main/URL_USUARIOS_GITHUB.csv";
+    const GITHUB_MATS = "https://raw.githubusercontent.com/leiclermarvim-hash/teste-app-2.0/refs/heads/main/URL_MATERIAIS_GITHUB.csv";
+    const GITHUB_MB52 = "https://raw.githubusercontent.com/leiclermarvim-hash/teste-app-2.0/main/MB52%20(9).csv";
+    const GITHUB_KITS = "https://raw.githubusercontent.com/leiclermarvim-hash/teste-app-2.0/main/kit_fast_request.csv";
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.search-results') && !e.target.closest('input')) {
+            document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none');
+        }
+    });
+
+    window.onload = async () => {
+        try {
+            const h = localStorage.getItem('fast_request_history');
+            if(h) historico = JSON.parse(h);
+            const cachedDb = localStorage.getItem('fast_request_db');
+            if(cachedDb) { db = JSON.parse(cachedDb); }
+        } catch(e) { console.error("Erro ao ler LocalStorage inicial:", e); }
+
+        renderBases();
+        executarLogicaGeralAdm();
+        toggleCalendarioProgramada();
+
+        // Força a atualização do GitHub e histórico ao carregar/atualizar a página sem afetar o rascunho
+        await updateBaseFromGithub(true); 
+        carregarHistoricoDaPlanilha();
+    };
+
+    function executarLogicaGeralAdm() {
+        try {
+            const el = document.getElementById('mat_adm');
+            if (!el) return;
+            const IsGeralAdm = el.value === "Sim";
+            if (IsGeralAdm) {
+                listaSolicitacao.forEach(item => item.adm = "Sim");
+            }
+            renderList();
+            saveDraft();
+        } catch(e) { console.error(e); }
+    }
+
+    function toggleCalendarioProgramada() {
+        const el = document.getElementById('tipo_sol_fake');
+        const div = document.getElementById('div_data_programada');
+        if (el && div) {
+            div.style.display = (el.value === "Programada") ? "block" : "none";
+        }
+    }
+
+    function alternarCampoFiltro() {
+        const vVal = document.getElementById('filtro_valor');
+        const dVal = document.getElementById('filtro_data');
+        const tipo = document.getElementById('filtro_tipo');
+        if(!vVal || !dVal || !tipo) return;
+
+        vVal.value = "";
+        dVal.value = "";
+        if(tipo.value === 'data') {
+            vVal.style.display = 'none';
+            dVal.style.display = 'block';
+        } else {
+            vVal.style.display = 'block';
+            dVal.style.display = 'none';
+        }
+        renderHistory();
+    }
+
+    function toggleKitSearch() {
+        const opt = document.getElementById('is_kit_option');
+        if(!opt) return;
+        const isKit = opt.value === "Sim";
+        document.getElementById('kit_cascata_div').style.display = isKit ? 'block' : 'none';
+        document.getElementById('manual_search_div').style.display = isKit ? 'none' : 'block';
+        if(isKit && db.kitBase && db.kitBase.length > 0) {
+            popularSelect('c_est', [...new Set(db.kitBase.map(x => x.est))]);
+            document.getElementById('c_est').disabled = false;
+        }
+    }
+
+    function popularSelect(id, opcoes) {
+        const sel = document.getElementById(id);
+        if(!sel) return;
+        sel.innerHTML = '<option value="">Selecione...</option>' + 
+            opcoes.filter(o => o).sort().map(o => `<option value="${o}">${o}</option>`).join('');
+    }
+
+    function filtrarCascata(nivel) {
+        const ids = ['c_est', 'c_red', 'c_pos', 'c_niv', 'c_alt', 'c_dan', 'c_cab'];
+        const props = ['est', 'red', 'pos', 'niv', 'alt', 'dan', 'cab'];
+        
+        for (let i = nivel; i < ids.length; i++) {
+            const campoSubsequente = document.getElementById(ids[i]);
+            if(campoSubsequente) {
+                campoSubsequente.innerHTML = '<option value="">Aguardando...</option>';
+                campoSubsequente.disabled = true;
+            }
+        }
+        document.getElementById('btn_add_kit').style.display = 'none';
+
+        if (document.getElementById(ids[nivel - 1]).value === "") return;
+
+        let dadosFiltrados = db.kitBase || [];
+        for (let i = 0; i < nivel; i++) {
+            const valorSelecionado = document.getElementById(ids[i]).value;
+            if (valorSelecionado) {
+                dadosFiltrados = dadosFiltrados.filter(x => x[props[i]] === valorSelecionado);
+            }
+        }
+
+        if (nivel === ids.length) {
+            document.getElementById('btn_add_kit').style.display = 'block';
+            return;
+        }
+
+        const proximasOpcoes = [...new Set(dadosFiltrados.map(x => x[props[nivel]]))].filter(o => o && o.trim() !== "");
+
+        if (proximasOpcoes.length > 0) {
+            popularSelect(ids[nivel], proximasOpcoes);
+            document.getElementById(ids[nivel]).disabled = false;
+        } else {
+            const kitFinal = dadosFiltrados[0];
+            if (kitFinal && kitFinal.codigoKit) {
+                document.getElementById('btn_add_kit').style.display = 'block';
+            }
+        }
+    }
+
+    function adicionarKitCascata() {
+        const sel = {
+            est: document.getElementById('c_est').value,
+            red: document.getElementById('c_red').value,
+            pos: document.getElementById('c_pos').value,
+            niv: document.getElementById('c_niv').value,
+            alt: document.getElementById('c_alt').value,
+            dan: document.getElementById('c_dan').value,
+            cab: document.getElementById('c_cab').value
+        };
+
+        let materiaisDoKit = (db.kitBase || []).filter(x => 
+            (!sel.est || x.est === sel.est) && (!sel.red || x.red === sel.red) && 
+            (!sel.pos || x.pos === sel.pos) && (!sel.niv || x.niv === sel.niv) && 
+            (!sel.alt || x.alt === sel.alt) && (!sel.dan || x.dan === sel.dan) && 
+            (!sel.cab || x.cab === sel.cab)
+        );
+
+        if (materiaisDoKit.length === 0) {
+            alert("Nenhum material associado a essa combinação técnica.");
+            return;
+        }
+
+        const codigoDoKitSelecionado = materiaisDoKit[0].codigoKit;
+        if (codigoDoKitSelecionado) {
+            materiaisDoKit = db.kitBase.filter(x => x.codigoKit === codigoDoKitSelecionado);
+        }
+
+        const itemAdm = document.getElementById('mat_adm').value;
+
+        materiaisDoKit.forEach(it => {
+            const cod = it.matCod ? it.matCod.replace(/[\r\n]/g, '').trim() : "";
+            if (!cod) return;
+
+            const materialOficial = db.mats.find(m => m.cod === cod);
+            let descReal = materialOficial ? materialOficial.desc : (it.matDescOriginal || "MATERIAL TÉCNICO");
+            descReal = descReal.replace(/[\r\n]/g, '').trim();
+            
+            const qtdLimpa = it.matQtd ? it.matQtd.replace(/[\r\n]/g, '').trim() : "1";
+
+            let itemExistente = listaSolicitacao.find(x => x.cod === cod);
+            if (itemExistente) {
+                let qtdAtual = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
+                let qtdNum = parseFloat(qtdLimpa.replace(',', '.')) || 1;
+                let novaQtd = qtdAtual + qtdNum;
+                itemExistente.qtd = novaQtd.toString().replace('.', ',');
+            } else {
+                listaSolicitacao.push({
+                    cod: cod,
+                    desc: descReal, 
+                    qtd: qtdLimpa.replace('.', ','), 
+                    adm: itemAdm
+                });
+            }
+        });
+
+        renderList();
+        validarForm();
+        alert("Materiais do kit inseridos com sucesso!");
+    }
+
+    function formatQtd(el) {
+        let val = el.value.replace(/[^\d.,]/g, '').replace(/\./g, ',');
+        const partes = val.split(',');
+        if (partes.length > 2) val = partes[0] + ',' + partes.slice(1).join('');
+        el.value = val;
+    }
+
+    function alterarQtdItemLinha(index, novaQtd) {
+        let val = novaQtd.replace(/[^\d.,]/g, '').replace(/\./g, ',');
+        if(listaSolicitacao[index]) {
+            listaSolicitacao[index].qtd = val;
+            saveDraft();
+            
+            const centroAtivo = document.getElementById('centro_selecionado').value;
+            if (centroAtivo) {
+                const item = listaSolicitacao[index];
+                const estoqueObj = db.mb52.find(x => x.cod === item.cod && x.centro === centroAtivo);
+                const dispSpan = document.getElementById(`disp_val_${index}`);
+                if (dispSpan && estoqueObj) {
+                    dispSpan.innerHTML = `<b>${estoqueObj.qtd}</b>`;
+                }
+            }
+        }
+    }
+
+    function toggleItemAdm(index, checked) {
+        if(listaSolicitacao[index]) {
+            listaSolicitacao[index].adm = checked ? "Sim" : "Não";
+            saveDraft();
+        }
+    }
+
+    function toggleTrafoField() {
+        const chk = document.getElementById('is_trafo');
+        if(chk) {
+            document.getElementById('trafo_input_div').style.display = chk.checked ? 'block' : 'none';
+        }
+    }
+
+    function switchTab(t) {
+        document.querySelectorAll('.tab, .page').forEach(el => el.classList.remove('active'));
+        const tabEl = document.getElementById('tab-'+t);
+        const pagEl = document.getElementById('page-'+t);
+        if(tabEl) tabEl.classList.add('active');
+        if(pagEl) pagEl.classList.add('active');
+        
+        const footer = document.querySelector('footer');
+        if(footer) footer.style.display = (t === 'request') ? 'block' : 'none';
+        
+        if (t === 'history') { renderHistory(); }
+        if (t === 'config') { renderBases(); }
+    }
+
+    function toggleCondicionalFields() {
+        const res = document.getElementById('reserva');
+        if(res) {
+            document.getElementById('campos_condicionais').style.display = (res.value === "Sim") ? 'flex' : 'none';
+        }
+    }
+
+    function saveDraft() {
+        try {
+            const d = {
+                sol_nome: document.getElementById('sol_nome').value, sol_mat: document.getElementById('sol_mat').value,
+                ate_nome: document.getElementById('ate_nome').value, ate_mat: document.getElementById('ate_mat').value,
+                projeto: document.getElementById('projeto').value, reserva: document.getElementById('reserva').value,
+                processo: document.getElementById('processo').value, centro_selecionado: document.getElementById('centro_selecionado').value,
+                centro_busca: document.getElementById('centro_busca').value, itens: listaSolicitacao,
+                movimentacao: document.getElementById('movimentacao').value,
+                tipo_sol: document.getElementById('tipo_sol_fake').value,
+                data_prog: document.getElementById('data_programada').value
+            };
+            localStorage.setItem('fast_request_draft', JSON.stringify(d));
+            validarForm();
+        } catch(e) { console.error(e); }
+    }
+
+    function searchData(mode) {
+        const input = document.getElementById(mode === 'mat' ? 'mat_busca' : (mode === 'centro' ? 'centro_busca' : mode + '_nome'));
+        const resDiv = document.getElementById(mode + '_results');
+        if(!input || !resDiv) return;
+        
+        const t = input.value.toUpperCase();
+        if (t.length < 1) { resDiv.style.display = 'none'; return; }
+
+        let html = "";
+        if (mode === 'centro') {
+            const centros = [...new Set((db.mb52 || []).map(x => x.centro))].filter(c => c && c.includes(t));
+            html = centros.slice(0, 5).map(c => `<div style="padding:10px; cursor:pointer;" onclick="selectCentro('${c}')">Centro <b>${c}</b></div>`).join('');
+        } else if (mode === 'mat') {
+            const centroAtivo = document.getElementById('centro_selecionado').value;
+            if(!centroAtivo) { alert("Selecione um Centro primeiro!"); return; }
+            
+            let f = (db.mats || []).filter(m => m.cod.includes(t) || m.desc.includes(t));
+            html = f.slice(0, 8).map(m => {
+                const estoqueObj = db.mb52.find(x => x.cod === m.cod && x.centro === centroAtivo);
+                const qtdEstoque = estoqueObj ? parseFloat(estoqueObj.qtd.replace(',','.')) : 0;
+                const cor = qtdEstoque > 0 ? 'green' : 'red';
+                return `<div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer;" onclick="selectItem('mat','${m.cod}','${m.desc}','${qtdEstoque}')">
+                    <b>${m.cod}</b><br><small>${m.desc}</small><br>
+                    <small style="color:${cor}; font-weight:bold;">Saldo no Centro: ${qtdEstoque}</small></div>`;
+            }).join('');
+        } else {
+            let f = (db.users || []).filter(u => u.nome && u.nome.includes(t));
+            html = f.slice(0, 8).map(x => `<div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer;" onclick="selectItem('${mode}','${x.nome}','${x.mat}')"><b>${x.nome}</b><br><small>${x.mat}</small></div>`).join('');
+        }
+        resDiv.innerHTML = html; resDiv.style.display = html ? 'block' : 'none';
+    }
+
+    function selectCentro(c) {
+        document.getElementById('centro_busca').value = c;
+        document.getElementById('centro_selecionado').value = c;
+        document.getElementById('centro_results').style.display = 'none';
+        renderList(); 
+        saveDraft();
+        renderBases();
+        carregarHistoricoDaPlanilha();
+    }
+
+    function selectItem(m, v1, v2, v3) {
+        if (m === 'mat') { 
+            document.getElementById('mat_busca').value = v1; 
+            const cor = parseFloat(v3) > 0 ? 'green' : 'red';
+            document.getElementById('mat_desc').innerHTML = `${v2} <br> <span style="color:${cor}">Saldo: ${v3 || 0}</span>`; 
+            document.getElementById('btn_add_mat').disabled = false; 
+        } else {
+            const nomeEl = document.getElementById(m + '_nome');
+            const matEl = document.getElementById(m + '_mat');
+            if(nomeEl) nomeEl.value = v1 || ''; 
+            if(matEl) matEl.value = v2 || '';
+        }
+        document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none');
+        saveDraft();
+    }
+
+    function addItem() {
+        const cod = document.getElementById('mat_busca').value;
+        const descOriginal = document.getElementById('mat_desc').innerText.split('\n')[0];
+        const qtdRaw = document.getElementById('mat_qtd').value;
+        const globalIsAdm = document.getElementById('mat_adm').value === "Sim";
+        const itemAdm = globalIsAdm ? "Sim" : "Não";
+        const isTrafo = document.getElementById('is_trafo').checked;
+        const numSerie = document.getElementById('trafo_serie').value;
+
+        if (!cod || qtdRaw === "0") return;
+
+        let descFinal = descOriginal;
+        if(isTrafo && numSerie) descFinal += ` (Patrimônio: ${numSerie})`;
+
+        let itemExistente = listaSolicitacao.find(x => x.cod === cod);
+
+        if (itemExistente) {
+            let qtdAtualNum = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
+            let qtdInseridaNum = parseFloat(qtdRaw.replace(',', '.')) || 1;
+            itemExistente.qtd = (qtdAtualNum + qtdInseridaNum).toString().replace('.', ',');
+            itemExistente.adm = itemAdm;
+        } else {
+            listaSolicitacao.push({ cod: cod, desc: descFinal, qtd: qtdRaw, adm: itemAdm });
+        }
+        
+        document.getElementById('mat_busca').value = "";
+        document.getElementById('mat_desc').innerText = "Nenhum item selecionado";
+        document.getElementById('mat_qtd').value = "1";
+        document.getElementById('btn_add_mat').disabled = true;
+        renderList(); saveDraft();
+    }
+
+    function renderList() {
+        const container = document.getElementById('lista_ui');
+        if(!container) return;
+
+        if (listaSolicitacao.length === 0) {
+            container.innerHTML = "";
+            return;
+        }
+
+        const centroAtivo = document.getElementById('centro_selecionado').value;
+        const isGeralAdm = document.getElementById('mat_adm').value === "Sim";
+
+        let htmlHeader = `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; font-size: 11px; font-weight: bold; color: var(--blue-main); text-transform: uppercase; border-bottom: 2px solid #ddd; margin-top: 10px; gap: 10px;">
+            <div style="display: flex; flex: 1; align-items: center; gap: 8px;">
+                <span style="width: 65px; flex-shrink: 0;">Cód</span>
+                <span style="flex: 1;">Descrição</span>
+                <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center; width: 140px; justify-content: flex-end;">
+                    <span style="width: 45px; text-align: center;">Ped</span>
+                    <span style="min-width: 55px; text-align: left; padding-left: 4px;">Disp</span>
+                    <span style="width: 30px; text-align: center;">ADM</span>
+                </div>
+            </div>
+            <span style="width: 24px; flex-shrink: 0;"></span>
+        </div>`;
+
+        let htmlItens = listaSolicitacao.map((item, i) => {
+            let saldoTexto = "0"; 
+            let corSaldo = 'var(--danger)';
+            let descMB52 = item.desc; 
+
+            if (centroAtivo && db.mb52) {
+                const estoqueObj = db.mb52.find(x => x.cod === item.cod && x.centro === centroAtivo);
+                if (estoqueObj) {
+                    saldoTexto = estoqueObj.qtd;
+                    corSaldo = parseFloat(estoqueObj.qtd.replace(',', '.')) > 0 ? '#21a366' : 'var(--danger)';
+                    if (estoqueObj.desc) { descMB52 = estoqueObj.desc.toUpperCase(); }
+                }
+            }
+            
+            return `
+            <div class="list-item">
+                <div class="list-text-wrapper" style="width: 100%;">
+                    <span class="item-code">${item.cod}</span>
+                    <span class="item-desc">${descMB52}</span>
+                    <div class="item-qty-wrapper" style="width: 140px;">
+                        <input type="text" class="inp-inline-qty" value="${item.qtd}" oninput="alterarQtdItemLinha(${i}, this.value)">
+                        <span class="item-qty" id="disp_val_${i}" style="color:${corSaldo}; min-width: 55px; text-align: left; padding-left: 4px;"><b>${saldoTexto}</b></span>
+                        <div style="width: 30px; display: flex; justify-content: center; align-items: center;">
+                            <input type="checkbox" ${item.adm === 'Sim' ? 'checked' : ''} ${isGeralAdm ? 'disabled' : ''} onchange="toggleItemAdm(${i}, this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
+                        </div>
+                    </div>
+                </div>
+                <button style="background: none; border: none; cursor: pointer; color: var(--danger); font-size: 16px; padding: 0 4px; flex-shrink:0;" onclick="listaSolicitacao.splice(${i},1);renderList();saveDraft()">🗑️</button>
+            </div>`;
+        }).reverse().join('');
+
+        container.innerHTML = htmlHeader + htmlItens;
+    }
+
+    function validarForm() {
+        const pInput = document.getElementById('projeto');
+        const sMat = document.getElementById('sol_mat');
+        const cSel = document.getElementById('centro_selecionado');
+        const tSol = document.getElementById('tipo_sol_fake');
+        const dProg = document.getElementById('data_programada');
+        const btn = document.getElementById('btn_confirm');
+
+        if(!pInput || !sMat || !cSel || !tSol || !dProg || !btn) return;
+
+        const tipoSol = tSol.value;
+        const dataProgOk = (tipoSol !== "Programada") || (dProg.value !== "");
+        
+        const ok = listaSolicitacao.length > 0 && 
+                   pInput.value !== "" && 
+                   sMat.value !== "" && 
+                   cSel.value !== "" && 
+                   dataProgOk;
+                   
+        btn.disabled = !ok; btn.classList.toggle('active', ok);
+    }
+
+
+    function gerarIdPedidoAutomatico() {
+        const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let tentativas = 0;
+        let novoId = '';
+
+        do {
+            let prefixo = '';
+            for (let i = 0; i < 4; i++) {
+                prefixo += letras.charAt(Math.floor(Math.random() * letras.length));
+            }
+            const numero = Math.floor(1000 + Math.random() * 9000).toString();
+            novoId = prefixo + numero;
+            tentativas++;
+        } while ((historico || []).some(h => String(h.idPedido || h.id || '') === novoId) && tentativas < 30);
+
+        return novoId;
+    }
+
+    function normalizarPedidoId(pedido) {
+        if (!pedido) return pedido;
+
+        const idFluxo = String(pedido.id_fluxo || '').trim();
+        let idAtual = String(pedido.idPedido || pedido.id || '').trim();
+        const idValido = /^[A-Z]{4}\d{4}$/.test(idAtual);
+        const idRepetiuFluxo = idFluxo && idAtual && idAtual === idFluxo;
+
+        // Guarda o identificador antigo da planilha para permitir excluir registros antigos,
+        // inclusive versões que usavam o ID do fluxo como ID do pedido.
+        if (idAtual && (!idValido || idRepetiuFluxo)) {
+            pedido.idPedidoOnlineOriginal = idAtual;
+        }
+
+        if (!idValido || idRepetiuFluxo) {
+            idAtual = gerarIdPedidoAutomatico();
+        }
+
+        pedido.id = idAtual;
+        pedido.idPedido = idAtual;
+        return pedido;
+    }
+
+    function obterIdOnlineParaExcluir(pedido) {
+        if (!pedido) return '';
+        return String(
+            pedido.idPedidoOnlineOriginal ||
+            pedido.idOnlineOriginal ||
+            pedido.idPedido ||
+            pedido.id ||
+            pedido.id_fluxo ||
+            ''
+        ).trim();
+    }
+
+    async function excluirPedidoOnlineSilencioso(idPedido) {
+        if (!idPedido) return true;
+
+        try {
+            const response = await fetch(URL_PLANILHA_GAS, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'deletarPedido',
+                    idPedido: idPedido
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result || result.status !== 'success') {
+                throw new Error((result && result.message) ? result.message : 'Falha ao excluir pedido na planilha.');
+            }
+
+            return true;
+        } catch (error) {
+            console.error(error);
+            alert('Não foi possível excluir o pedido on-line para edição: ' + error.message + '\n\nO pedido não foi carregado para edição para evitar duplicidade.');
+            return false;
+        }
+    }
+
+    function confirmarPedido() {
+        if(!confirm("Salvar pedido?")) return;
+
+        const agora = new Date();
+        const idPedidoGerado = pedidoEmEdicaoId || gerarIdPedidoAutomatico();
+
+        let novo = {
+            id: idPedidoGerado,
+            idPedido: idPedidoGerado,
+            data: agora.toLocaleDateString('pt-BR'),
+            hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            projeto: document.getElementById('projeto').value.toUpperCase(),
+            solic: document.getElementById('sol_nome').value,
+            sol_mat: document.getElementById('sol_mat').value,
+            atend: document.getElementById('ate_nome').value,
+            atend_mat: document.getElementById('ate_mat').value,
+            processo: document.getElementById('processo').value,
+            movim: document.getElementById('movimentacao').value,
+            reserva_num: document.getElementById('reserva_num').value,
+            id_fluxo: document.getElementById('id_fluxo').value,
+            mat_adm: document.getElementById('mat_adm').value,
+            centro: document.getElementById('centro_selecionado').value,
+            tipo_sol: document.getElementById('tipo_sol_fake').value,
+            data_exec_programada: document.getElementById('tipo_sol_fake').value === "Programada" ? document.getElementById('data_programada').value : "",
+            itens: [...listaSolicitacao],
+            status: 'pendente'
+        };
+
+        novo = normalizarPedidoId(novo);
+        historico.unshift(novo);
+        localStorage.setItem('fast_request_history', JSON.stringify(historico));
+
+        pedidoEmEdicaoId = "";
+        listaSolicitacao = [];
+        renderList();
+        switchTab('history');
+    }
+
+    async function carregarHistoricoDaPlanilha() {
+        try {
+            const elCentro = document.getElementById('centro_selecionado');
+            const centroAtivo = elCentro ? elCentro.value : "";
+
+            const linkCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQi-2eq7mLOU1EGb9p9pGywQKNACF8jksbn3BHuSeKy0M3An5ovpZeeXgFvTnrM8-Ky5O6D24zyrfcN/pub?output=csv";
+            
+            const response = await fetch(linkCSV);
+            if (!response.ok) return;
+            
+            const textoCSV = await response.text();
+            const lines = textoCSV.split(/\r?\n/).slice(1); 
+            
+            let dadosFiltrados = [];
+            
+            lines.forEach(linha => {
+                if (!linha.trim()) return;
+
+                const c = inlineSplitCSV(linha);
+                if (c.length < 20) return; 
+                
+                const centroLinha = c[3] ? c[3].replace(/"/g, '').trim() : "";
+                if (!centroLinha) return;
+
+                if (centroAtivo && centroLinha.toLowerCase() !== centroAtivo.toLowerCase()) return; 
+                
+                dadosFiltrados.push({
+                    data: c[0] ? c[0].replace(/"/g, '').trim() : "",
+                    hora: c[1] ? c[1].replace(/"/g, '').trim() : "",
+                    projeto: c[2] ? c[2].replace(/"/g, '').trim() : "",
+                    centro: centroLinha,
+                    tipo_sol: c[4] ? c[4].replace(/"/g, '').trim() : "",
+                    data_exec_programada: c[5] ? c[5].replace(/"/g, '').trim() : "",
+                    solic: c[6] ? c[6].replace(/"/g, '').trim() : "",
+                    sol_mat: c[7] ? c[7].replace(/"/g, '').trim() : "",
+                    atend: c[8] ? c[8].replace(/"/g, '').trim() : "",
+                    atend_mat: c[9] ? c[9].replace(/"/g, '').trim() : "",
+                    processo: c[10] ? c[10].replace(/"/g, '').trim() : "",
+                    movim: c[11] ? c[11].replace(/"/g, '').trim() : "",
+                    mat_adm: c[12] ? c[12].replace(/"/g, '').trim() : "",
+                    reserva_num: c[13] ? c[13].replace(/"/g, '').trim() : "",
+                    id_fluxo: c[14] ? c[14].replace(/"/g, '').trim() : "",
+                    status: c[19] ? c[19].replace(/"/g, '').replace(/\r/g, '').trim() : 'efetivado',
+                    itens: [{
+                        cod: c[15] ? c[15].replace(/"/g, '').trim() : "",
+                        desc: c[16] ? c[16].replace(/"/g, '').trim() : "",
+                        qtd: c[17] ? c[17].replace(/"/g, '').trim() : "0",
+                        adm: c[18] ? c[18].replace(/"/g, '').trim() : "Não"
+                    }]
+                });
+            });
+
+            let historicoAgrupado = [];
+            dadosFiltrados.forEach(item => {
+                if (!item.id_fluxo) return;
+                let existente = historicoAgrupado.find(h => h.id_fluxo === item.id_fluxo);
+                if (existente) {
+                    const jaExisteItem = existente.itens.some(i => i.cod === item.itens[0].cod);
+                    if (!jaExisteItem) existente.itens.push(item.itens[0]);
+                } else {
+                    historicoAgrupado.push(item);
+                }
+            });
+
+            let historicoLocal = [];
+            try {
+                const localData = localStorage.getItem('fast_request_history');
+                if (localData) historicoLocal = JSON.parse(localData);
+            } catch(e) { console.error(e); }
+            
+            const pendentesLocais = historicoLocal.filter(h => {
+                if (!h || h.status !== 'pendente') return false;
+                if (centroAtivo && h.centro && h.centro.toLowerCase() !== centroAtivo.toLowerCase()) return false;
+                return true;
+            });
+
+            historico = [...pendentesLocais, ...historicoAgrupado].map(h => normalizarPedidoId(h));
+            localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            
+            renderHistory();
+        } catch (error) { 
+            console.error("Erro ao carregar o histórico:", error); 
+        }
+    }
+
+    function inlineSplitCSV(linha) {
+        let colunas = [];
+        let r = "", aspas = false;
+        for (let i = 0; i < linha.length; i++) {
+            let c = linha[i];
+            if (c === '"') { aspas = !aspas; }
+            else if (c === ',' && !aspas) { colunas.push(r); r = ""; }
+            else { r += c; }
+        }
+        colunas.push(r);
+        return colunas;
+    }
+
+    function renderHistory() {
+        const container = document.getElementById('history_list');
+        const titFiltro = document.getElementById('titulo_filtro_busca');
+        if (!container) return;
+        
+        const centroAtivo = document.getElementById('centro_selecionado').value;
+
+        historico = (historico || []).map(h => normalizarPedidoId(h));
+        let listaFiltrada = historico;
+        if (centroAtivo) {
+            listaFiltrada = listaFiltrada.filter(h => h && h.centro === centroAtivo);
+            if(titFiltro) titFiltro.innerText = `🔍 Filtro de Buscas — Centro ${centroAtivo}`;
+        } else {
+            if(titFiltro) titFiltro.innerText = `🔍 Filtro de Buscas (Global — Todos os Centros)`;
+        }
+
+        const tipoFiltro = document.getElementById('filtro_tipo').value;
+        if(tipoFiltro === 'projeto') {
+            const v = document.getElementById('filtro_valor').value.toUpperCase();
+            if(v) listaFiltrada = listaFiltrada.filter(h => h.projeto && h.projeto.toUpperCase().includes(v));
+        } else if(tipoFiltro === 'reserva') {
+            const v = document.getElementById('filtro_valor').value.trim();
+            if(v) listaFiltrada = listaFiltrada.filter(h => h.reserva_num && h.reserva_num.includes(v));
+        } else if(tipoFiltro === 'data') {
+            const d = document.getElementById('filtro_data').value; 
+            if(d) {
+                const dFormatada = d.split('-').reverse().join('/'); 
+                listaFiltrada = listaFiltrada.filter(h => h.data === dFormatada);
+            }
+        }
+
+        if (listaFiltrada.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding: 20px; color: #666;">Nenhum pedido localizado para os filtros informados.</div>`;
+            return;
+        }
+
+        let grupos = {};
+        listaFiltrada.forEach(h => {
+            const chaveGrupo = `${h.projeto || 'SEM_PROJETO'}_${h.data}`;
+            if (!grupos[chaveGrupo]) {
+                grupos[chaveGrupo] = {
+                    projeto: h.projeto,
+                    data: h.data,
+                    pedidos: []
+                };
+            }
+            grupos[chaveGrupo].pedidos.push(h);
+        });
+
+        container.innerHTML = Object.values(grupos).map(grupo => {
+            return `
+            <div style="background: #fff; padding: 12px; border: 2px solid var(--blue-main); border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
+                <div style="background: var(--blue-main); color:white; padding: 6px 10px; font-size:13px; font-weight:bold; border-radius:6px; margin-bottom:10px;">
+                    📂 PROJETO: ${grupo.projeto} | DATA EMISSÃO: ${grupo.data}
+                </div>
+                ${grupo.pedidos.map(h => {
+                    const indexReal = historico.findIndex(item => item === h);
+                    const solDataExec = h.tipo_sol === "Programada" && h.data_exec_programada ? `<br><b>Data Programada Execução:</b> ${h.data_exec_programada.split('-').reverse().join('/')}` : '';
+                    
+                    const isEfetivado = h.status === 'efetivado';
+                    const btnLabel = isEfetivado ? '✅ Sincronizado' : 'Salvar Planilha';
+                    const btnDisabled = isEfetivado ? 'disabled' : '';
+
+                    return `
+                    <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fafafa;">
+                        <div class="hist-meta-box">
+                            <div><b>ID Pedido:</b> ${h.id || h.idPedido || '---'}</div>
+                            <div><b>Centro Operacional:</b> Centro ${h.centro || '---'}</div>
+                            <div><b>Emissão:</b> ${h.data} às ${h.hora || '--:--'}</div>
+                            <div><b>Tipo de Solicitação:</b> ${h.tipo_sol || 'OSM'} ${solDataExec}</div>
+                            <div><b>Solicitante:</b> ${h.solic || '---'} (Mat: ${h.sol_mat || '---'})</div>
+                            <div><b>Atendente:</b> ${h.atend || '---'} (Mat: ${h.atend_mat || '---'})</div>
+                            <div><b>Processo / Fluxo:</b> ${h.processo || '---'} | ID Fluxo: ${h.id_fluxo || '---'}</div>
+                            <div><b>Movimentação:</b> ${h.movim || '---'}</div>
+                            <div><b>Nº Reserva:</b> ${h.reserva_num || '---'}</div>
+                            <div><b>Status Envio:</b> ${isEfetivado ? '<span style="color:green;font-weight:bold;">Sincronizado na Nuvem</span>' : '<span style="color:orange;font-weight:bold;">Pendente Local</span>'}</div>
+                        </div>
+                        <table class="hist-table">
+                            <thead>
+                                <tr style="background:#eee; text-align:left;">
+                                    <th style="padding:4px;">Cód</th>
+                                    <th style="padding:4px;">Descrição</th>
+                                    <th style="padding:4px;">Qtd</th>
+                                    <th style="padding:4px;">ADM</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${h.itens && Array.isArray(h.itens) ? h.itens.map(it => `
+                                    <tr>
+                                        <td style="padding:4px; font-weight:bold;">${it.cod}</td>
+                                        <td style="padding:4px;">${it.desc}</td>
+                                        <td style="padding:4px; font-weight:bold;">${it.qtd}</td>
+                                        <td style="padding:4px; font-weight:bold; color: ${it.adm === 'Sim'?'var(--danger)':'#333'}">${it.adm || 'Não'}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="4">Sem itens cadastrados</td></tr>'}
+                            </tbody>
+                        </table>
+                        <div class="hist-actions">
+                            <button class="btn-hist btn-h-edit" onclick="acaoEditarEExcluirDoHistorico(${indexReal})">✏️ Editar</button>
+                            <button class="btn-hist btn-h-planilha" ${btnDisabled} onclick="efetivarPedido(${indexReal}, this)">${btnLabel}</button>
+                            <button class="btn-hist btn-h-wa" onclick="reutilizarWA(${indexReal})">WhatsApp</button>
+                            <button class="btn-hist btn-h-email" onclick="direcionarParaEmail(${indexReal})">📧 E-mail</button>
+                           <button class="btn-hist btn-h-csv" onclick="exportarParaCSV(${indexReal})">💾 Gerar CSV</button>
+                           <button class="btn-hist btn-h-delete" onclick="deletarPedidoOnline(${indexReal})">🗑️ Excluir pedido</button>
+                        </div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>`;
+        }).join('');
+    }
+
+    async function acaoEditarEExcluirDoHistorico(i) {
+        if (!historico[i]) return;
+
+        const pedido = normalizarPedidoId(historico[i]);
+        const idPedidoTela = pedido.idPedido || pedido.id || "";
+        const idParaExcluirOnline = obterIdOnlineParaExcluir(pedido);
+        const projeto = pedido.projeto || "---";
+
+        const mensagem = `Deseja editar este pedido?
+
+ID Pedido: ${idPedidoTela || '---'}
+Projeto/OSM: ${projeto}
+
+Ao clicar em OK, o sistema tentará excluir o pedido da planilha on-line e carregará os dados na aba NOVO para edição.
+
+Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidade.`;
+        if (!confirm(mensagem)) return;
+
+        if (idParaExcluirOnline) {
+            const excluiuOnline = await excluirPedidoOnlineSilencioso(idParaExcluirOnline);
+            if (!excluiuOnline) return;
+        }
+
+        pedidoEmEdicaoId = idPedidoTela || gerarIdPedidoAutomatico();
+
+        document.getElementById('projeto').value = pedido.projeto || "";
+        document.getElementById('sol_nome').value = pedido.solic || "";
+        document.getElementById('sol_mat').value = pedido.sol_mat || "";
+        document.getElementById('ate_nome').value = pedido.atend || "";
+        document.getElementById('ate_mat').value = pedido.atend_mat || "";
+        document.getElementById('processo').value = pedido.processo || "";
+        document.getElementById('movimentacao').value = pedido.movim || "Z61 - Saída de material";
+        document.getElementById('reserva_num').value = pedido.reserva_num || "";
+        document.getElementById('id_fluxo').value = pedido.id_fluxo || "";
+        document.getElementById('mat_adm').value = pedido.mat_adm || "Não";
+        document.getElementById('centro_selecionado').value = pedido.centro || "";
+        document.getElementById('centro_busca').value = pedido.centro || "";
+        document.getElementById('tipo_sol_fake').value = pedido.tipo_sol || "OSM";
+        document.getElementById('data_programada').value = pedido.data_exec_programada || "";
+
+        document.getElementById('reserva').value = (pedido.reserva_num || pedido.id_fluxo) ? "Sim" : "Não";
+        listaSolicitacao = [...(pedido.itens || [])];
+
+        historico.splice(i, 1);
+        localStorage.setItem('fast_request_history', JSON.stringify(historico));
+
+        toggleCondicionalFields();
+        toggleCalendarioProgramada();
+        renderList();
+        executarLogicaGeralAdm();
+        validarForm();
+        switchTab('request');
+    }
+
+    function exportarParaCSV(i) {
+        const pedido = historico[i];
+        if(!pedido || !pedido.itens || pedido.itens.length === 0) return alert("Nenhum item para exportar.");
+
+        let ativoValor = "0"; 
+        const movimLower = (pedido.movim || "").toLowerCase();
+        if (movimLower.includes("z61")) {ativoValor = "1";} 
+        else if (movimLower.includes("sucata") || movimLower.includes("z6d")) {ativoValor = "2";}
+
+        const numPedido = pedido.reserva_num ? pedido.reserva_num.trim() : "";
+
+        let csvRows = [];
+        csvRows.push("Codigo do material;descricao do material;Ativo;quantidade reservada;processo;Nº Pedido");
+
+        pedido.itens.forEach(it => {
+            const cod = it.cod ? it.cod.replace(/[\r\n]/g, '').trim() : "";
+            const desc = it.desc ? it.desc.replace(/;/g, ' ').replace(/[\r\n]/g, '').trim() : "";
+            const qtd = it.qtd ? it.qtd.replace(/[\r\n]/g, '').trim() : "1";
+            const proc = pedido.processo ? pedido.processo.replace(/;/g, ' ').replace(/[\r\n]/g, '').trim() : "";
+            
+            csvRows.push(`${cod};${desc};${ativoValor};${qtd};${proc};${numPedido}`);
+        });
+
+        const csvString = csvRows.join("\n");
+        const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+        
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", `pedido_${pedido.projeto || 'sem_nome'}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    async function efetivarPedido(indexReal, btnEl) {
+        let pedidoParaEnviar;
+
+        if (indexReal !== undefined && indexReal !== null && historico[indexReal]) {
+            pedidoParaEnviar = JSON.parse(JSON.stringify(historico[indexReal]));
+        } else {
+            if (listaSolicitacao.length === 0) { alert("Nenhum item na lista!"); return; }
+            const agora = new Date();
+            const idPedidoGerado = pedidoEmEdicaoId || gerarIdPedidoAutomatico();
+
+            pedidoParaEnviar = {
+                id: idPedidoGerado,
+                idPedido: idPedidoGerado,
+                data: agora.toLocaleDateString('pt-BR'),
+                hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                projeto: document.getElementById('projeto').value.toUpperCase(),
+                solic: document.getElementById('sol_nome').value,
+                sol_mat: document.getElementById('sol_mat').value,
+                atend: document.getElementById('ate_nome').value,
+                atend_mat: document.getElementById('ate_mat').value,
+                processo: document.getElementById('processo').value,
+                movim: document.getElementById('movimentacao').value,
+                reserva_num: document.getElementById('reserva_num').value,
+                id_fluxo: document.getElementById('id_fluxo').value,
+                mat_adm: document.getElementById('mat_adm').value,
+                centro: document.getElementById('centro_selecionado').value,
+                tipo_sol: document.getElementById('tipo_sol_fake').value,
+                data_exec_programada: document.getElementById('tipo_sol_fake').value === "Programada" ? document.getElementById('data_programada').value : "",
+                status: 'pendente',
+                itens: [...listaSolicitacao]
+            };
+        }
+
+        pedidoParaEnviar = normalizarPedidoId(pedidoParaEnviar);
+
+        const btn = btnEl || document.getElementById('btn_enviar');
+        if(btn) { btn.disabled = true; btn.innerText = "Enviando..."; }
+
+        pedidoParaEnviar.itens = pedidoParaEnviar.itens.map(i => {
+            let qtdTratada = i.qtd ? String(i.qtd).replace(/[\r\n]/g, '').trim() : "1";
+            return {
+                cod: i.cod ? String(i.cod).replace(/[\r\n]/g, '').trim() : "",
+                desc: i.desc ? String(i.desc).replace(/[\r\n]/g, '').trim() : "",
+                qtd: qtdTratada,
+                adm: i.adm || "Não"
+            };
+        });
+
+        try {
+            const response = await fetch(URL_PLANILHA_GAS, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'salvarPedido',
+                    dados: pedidoParaEnviar
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result || result.status !== 'success') {
+                throw new Error((result && result.message) ? result.message : 'Falha ao salvar pedido na planilha.');
+            }
+
+            // Mantém o ID gerado no aplicativo. Não sobrescreve com retorno do Apps Script.
+            pedidoParaEnviar = normalizarPedidoId(pedidoParaEnviar);
+            pedidoParaEnviar.status = 'efetivado';
+
+            if (indexReal !== undefined && indexReal !== null && historico[indexReal]) {
+                historico[indexReal] = pedidoParaEnviar;
+            } else {
+                historico.unshift(pedidoParaEnviar);
+                listaSolicitacao = [];
+            }
+
+            pedidoEmEdicaoId = "";
+            localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            alert("Pedido sincronizado com sucesso!");
+            renderList();
+            renderHistory();
+        } catch (e) {
+            console.error(e);
+            alert(`Mantido em cache local. Falha ao enviar.`);
+
+            if (indexReal === undefined || indexReal === null) {
+                pedidoParaEnviar.status = 'pendente';
+                historico.unshift(pedidoParaEnviar);
+                localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            }
+
+            renderHistory();
+        } finally {
+            if(btn && (!pedidoParaEnviar || pedidoParaEnviar.status !== 'efetivado')) {
+                btn.disabled = false;
+                btn.innerText = "Salvar Planilha";
+            }
+        }
+    }
+
+    async function deletarPedidoOnline(i) {
+        const pedido = historico[i];
+        if (!pedido) return;
+
+        const idPedido = obterIdOnlineParaExcluir(pedido);
+        const projeto = pedido.projeto || "---";
+        const mensagem = idPedido
+            ? `Confirma excluir o pedido ${idPedido} do histórico e da planilha on-line?\n\nProjeto/OSM: ${projeto}`
+            : `Este pedido ainda não possui ID on-line. Deseja remover apenas do histórico local?\n\nProjeto/OSM: ${projeto}`;
+
+        if (!confirm(mensagem)) return;
+
+        if (!idPedido) {
+            historico.splice(i, 1);
+            localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            renderHistory();
+            return;
+        }
+
+        try {
+            const response = await fetch(URL_PLANILHA_GAS, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'deletarPedido',
+                    idPedido: idPedido
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result || result.status !== 'success') {
+                throw new Error((result && result.message) ? result.message : 'Falha ao excluir pedido na planilha.');
+            }
+
+            historico.splice(i, 1);
+            localStorage.setItem('fast_request_history', JSON.stringify(historico));
+            renderHistory();
+            alert(result.message || 'Pedido excluído com sucesso.');
+        } catch (error) {
+            console.error(error);
+            alert('Não foi possível excluir o pedido na planilha on-line: ' + error.message);
+        }
+    }
+    function reutilizarWA(i) {
+        const h = historico[i]; 
+        if (!h || !h.itens || h.itens.length === 0) return;
+
+        const dataProgFormatada = (h.tipo_sol === "Programada" && h.data_exec_programada) 
+            ? h.data_exec_programada.split('-').reverse().join('/') 
+            : '---';
+
+        let textoMensagem = `*NOVA SOLICITAÇÃO*\n\n`;
+        textoMensagem += `*PROJETO / OSM:* ${h.projeto || '---'}\n`;
+        textoMensagem += `*Centro Operacional:* Centro ${h.centro || '---'}\n`;
+        textoMensagem += `*Data Emissão:* ${h.data || '---'} às ${h.hora || '--:--'}\n`;
+        textoMensagem += `*Tipo de Solicitação:* ${h.tipo_sol || 'OSM'}\n`;
+        if (h.tipo_sol === "Programada") {
+            textoMensagem += `*Data Execução Programada:* ${dataProgFormatada}\n`;
+        }
+        textoMensagem += `*Solicitante:* ${h.solic || '---'} (Mat: ${h.sol_mat || '---'})\n`;
+        textoMensagem += `*Atendente:* ${h.atend || '---'} (Mat: ${h.atend_mat || '---'})\n`;
+        textoMensagem += `*Processo:* ${h.processo || '---'}\n`;
+        textoMensagem += `*Movimentação:* ${h.movim || '---'}\n`;
+        textoMensagem += `*Nº Reserva:* ${h.reserva_num || '---'}\n`;
+        if (h.id_fluxo) textoMensagem += `*ID do Fluxo:* ${h.id_fluxo}\n`;
+        textoMensagem += `*Saída Geral ADM:* ${h.mat_adm || 'Não'}\n\n`;
+        
+        textoMensagem += `*ITENS SOLICITADOS:*\n`;
+        h.itens.forEach(m => {
+            textoMensagem += `${m.cod} - ${m.desc}${m.adm === 'Sim' ? ' *(ADM)*' : ''} - ${m.qtd}\n`;
+        });
+
+        const textoCodificado = encodeURIComponent(textoMensagem);
+        const usarAplicativo = confirm("Deseja abrir no Aplicativo do WhatsApp?");
+        let urlWhatsApp = usarAplicativo ? `https://wa.me/?text=${textoCodificado}` : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+        
+        window.open(urlWhatsApp, '_blank');
+    }
+
+   function direcionarParaEmail(i) {
+        const h = historico[i];
+        if (!h || !h.itens || h.itens.length === 0) return;
+
+        const dataProgFormatada = (h.tipo_sol === "Programada" && h.data_exec_programada) 
+            ? h.data_exec_programada.split('-').reverse().join('/') 
+            : '---';
+
+	const mesmoSolicitanteEAtendente =
+   		 String(h.sol_mat || '').trim() !== '' &&
+   		 String(h.atend_mat || '').trim() !== '' &&
+   		 String(h.sol_mat || '').trim() === String(h.atend_mat || '').trim();
+
+        const assunto = `Projeto: ${h.projeto || '---'} / Reserva: ${h.reserva_num || '---'} / Processo: ${h.processo}`;        
+        let corpoEmail = `Prezados,\nSegue abaixo o escopo detalhado da nova solicitação:\n\n`;
+	corpoEmail += `Solicitante: ${h.solic || '---'} (Matrícula: ${h.sol_mat || '---'})\n`;
+      		 if (!mesmoSolicitanteEAtendente) {
+   			 corpoEmail += `Atendente: ${h.atend || '---'} (Matrícula: ${h.atend_mat || '---'})\n`;}
+	corpoEmail += `Data Emissão: ${h.data || '---'} às ${h.hora || '--:--'}\n`;
+        corpoEmail += `PROJETO / OSM: ${h.projeto || '---'}\n`;
+	corpoEmail += `Nº Reserva: ${h.reserva_num || '---'}\n`;
+        if (h.id_fluxo) corpoEmail += `ID do Fluxo: ${h.id_fluxo}\n`;
+	corpoEmail += `Tipo de Solicitação: ${h.tipo_sol || 'OSM'}\n`;
+	corpoEmail += `Centro Operacional: Centro ${h.centro || '---'}\n`;
+	corpoEmail += `Processo: ${h.processo || '---'}\n`;
+	
+	corpoEmail += `Movimentação: ${h.movim || '---'}\n`;
+        if (h.tipo_sol === "Programada") {corpoEmail += `Data de Execução Programada: ${dataProgFormatada}\n`;}
+          
+        corpoEmail += `\n\nITENS SOLICITADOS:\n`;
+        corpoEmail += `CODIGO - DESCRICAO - QUANTIDADE\n`;
+
+        // Formato identico ao do WhatsApp
+        h.itens.forEach(m => {
+            corpoEmail += `${m.cod} - ${m.desc}${m.adm === 'Sim' ? ' *(ADM)*' : ''} - ${m.qtd}\n`;
+        });
+        
+        corpoEmail += `\nAtenciosamente,\n${h.solic || '---'}.`;
+
+        // Pergunta ao usuário qual versão do Outlook ele deseja usar
+        const usarAplicativo = confirm("Deseja abrir no Aplicativo do Outlook?\n\n(Clique em 'Cancelar' para abrir o Outlook Web)");
+
+        if (usarAplicativo) {
+            // Abre o aplicativo nativo do sistema usando mailto:
+            const mailtoUrl = `mailto:?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
+            window.location.href = mailtoUrl;
+        } else {
+            // Abre o Outlook Web no navegador preenchendo tudo automaticamente
+            const urlOutlookWeb = `https://outlook.office.com/mail/deeplink/compose?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
+            window.open(urlOutlookWeb, '_blank');
+        }
+    }
+
+    async function updateBaseFromGithub(silent = false) {
+        try {
+            const [resU, resM, resMB, resK] = await Promise.all([fetch(GITHUB_USERS), fetch(GITHUB_MATS), fetch(GITHUB_MB52), fetch(GITHUB_KITS)]);
+            const textU = await resU.text(), textM = await resM.text(), textMB = await resMB.text(), textK = await resK.text();
+            
+            db.users = textU.split('\n').slice(1).map(r => { 
+                const c = r.split(';'); 
+                return c.length >= 2 ? { nome: c[0].trim().toUpperCase(), mat: c[1].trim() } : null; 
+            }).filter(x => x);
+            
+            db.mats = textM.split('\n').slice(1).map(r => { 
+                const c = r.split(';'); 
+                return c.length >= 2 ? { cod: c[0].trim(), desc: c[1].trim().toUpperCase() } : null; 
+            }).filter(x => x);
+            
+            db.mb52 = textMB.split('\n').slice(1).map(r => { 
+                const c = r.split(';'); 
+                return c.length >= 7 ? { cod: c[0].trim(), desc: c[1]?.trim(), centro: c[3].trim(), qtd: c[6].trim() } : null; 
+            }).filter(x => x);
+
+            db.kitBase = textK.split('\n').slice(1).map(l => {
+                const c = l.split(';'); if(c.length < 12) return null;
+                let descLimpa = c[10]?.trim().toUpperCase() || ""; 
+                descLimpa = descLimpa.replace(/MO/g, 'MAO').replace(/[^A-Z0-9\s,.\-\/()]/gi, '');
+                return { 
+                    est: c[2]?.trim(), red: c[3]?.trim(), pos: c[4]?.trim(), niv: c[5]?.trim(), alt: c[6]?.trim(), dan: c[7]?.trim(), cab: c[8]?.trim(), 
+                    matDescOriginal: descLimpa, matCod: c[9]?.trim() ? c[9].replace(/[\r\n]/g, '').trim() : "", matQtd: c[11]?.trim() ? c[11].replace(/[\r\n]/g, '').trim() : "1",
+                    codigoKit: c[c.length - 1]?.trim() ? c[c.length - 1].replace(/[\r\n]/g, '').trim() : "" 
+                };
+            }).filter(x => x && x.est && x.matCod);
+
+            localStorage.setItem('fast_request_db', JSON.stringify(db));
+            renderBases();
+            if(!silent) alert("Bases atualizadas com sucesso!");
+        } catch (err) { console.error("Erro na busca do GitHub:", err); }
+    }
+
+    function renderBases() {
+        renderMatsCentroTable();
+        renderUsersCentroTable();
+    }
+
+    function renderMatsCentroTable() {
+        const tbody = document.querySelector('#table-mats tbody');
+        const title = document.getElementById('base_title');
+        const centroAtivo = document.getElementById('centro_selecionado')?.value;
+        if(!tbody || !title) return;
+
+        if (!centroAtivo) {
+            title.innerText = `📊 Base de Dados - Sem centro`;
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--danger); font-weight:bold; padding:10px;">Selecione um Centro na aba NOVO primeiro.</td></tr>`;
+            return;
+        }
+
+        title.innerText = `📊 Base de Dados - Materiais do Centro ${centroAtivo}`;
+        const matsDoCentro = (db.mb52 || []).filter(x => x.centro === centroAtivo);
+
+        if (matsDoCentro.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:10px;">Nenhum material associado no MB52.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = matsDoCentro.map(m => `
+            <tr>
+                <td style="font-weight:bold;">${m.cod}</td>
+                <td>${m.desc ? m.desc.toUpperCase() : '---'}</td>
+                <td style="font-weight:bold; color:${parseFloat(m.qtd.replace(',','.')) > 0 ? 'green' : 'red'}">${m.qtd}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderUsersCentroTable() {
+        const tbody = document.querySelector('#table-users tbody');
+        const title = document.getElementById('base_users_title');
+        if(!tbody || !title) return;
+
+        title.innerText = `👥 Base de Dados - Colaboradores Globais`;
+        if (!db.users || db.users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; padding:10px;">Nenhum usuário localizado na base.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = db.users.map(u => `<tr><td style="font-weight:bold;">${u.mat}</td><td>${u.nome}</td></tr>`).join('');
+    }
+
+    (() => {
+        try {
+            const rascunho = localStorage.getItem('fast_request_draft');
+            if (!rascunho) return;
+            const d = JSON.parse(rascunho);
+            
+            if (d.centro_selecionado) {
+                document.getElementById('centro_selecionado').value = d.centro_selecionado;
+                document.getElementById('centro_busca').value = d.centro_busca || d.centro_selecionado;
+            }
+            if (d.sol_nome) document.getElementById('sol_nome').value = d.sol_nome;
+            if (d.sol_mat) document.getElementById('sol_mat').value = d.sol_mat;
+            if (d.ate_nome) document.getElementById('ate_nome').value = d.ate_nome;
+            if (d.ate_mat) document.getElementById('ate_mat').value = d.ate_mat;
+            if (d.projeto) document.getElementById('projeto').value = d.projeto;
+            if (d.tipo_sol) document.getElementById('tipo_sol_fake').value = d.tipo_sol;
+            if (d.data_prog) document.getElementById('data_programada').value = d.data_prog;
+            if (d.processo) document.getElementById('processo').value = d.processo;
+            if (d.mat_adm) document.getElementById('mat_adm').value = d.mat_adm;
+            if (d.movimentacao) document.getElementById('movimentacao').value = d.movimentacao;
+            
+            if (d.reserva) {
+                document.getElementById('reserva').value = d.reserva;
+                if (d.reserva === "Sim") {
+                    if(d.id_fluxo) document.getElementById('id_fluxo').value = d.id_fluxo;
+                    if(d.reserva_num) document.getElementById('reserva_num').value = d.reserva_num;
+                }
+            }
+            if (d.itens) { listaSolicitacao = d.itens; }
+        } catch (e) { console.error("Erro ao ler rascunho:", e); }
+    })();
+
+    function confirmReset() { 
+        if(confirm("Limpar tudo?")) { 
+            localStorage.removeItem('fast_request_draft'); 
+            location.reload(); 
+        } 
+    }document.addEventListener("DOMContentLoaded", function() {
+    // Texto em Base64 para ocultar: "Aplicativo desenvolvido por Leicler Marvim"
+    const infoCripto = "QXBsaWNhdGl2byBkZXNlbnZvbHZpZG8gcG9yIExlaWNsZXIgTWFydmlt";
+    const textoOriginal = atob(infoCripto);
+    
+    // 1. Cria o elemento de rodapé dinamicamente com os novos estilos (itálico e opacidade)
+    const rodape = document.createElement("div");
+    rodape.id = "sistema_copyright_protegido";
+    // Adicionado font-style: italic e opacity: 0.55 para ficar bem discreto
+    rodape.style.cssText = "text-align:center; padding:12px; font-size:11px; color:#777; background:#ffffff; border-top:1px solid #ddd; font-weight:bold; font-style:italic; opacity:0.55; position:relative; z-index:9999; font-family:'Segoe UI', sans-serif;";
+    rodape.innerText = textoOriginal;
+    
+    // Insere o rodapé dentro do container principal (.app)
+    const appContainer = document.querySelector(".app") || document.body;
+    appContainer.appendChild(rodape);
+
+    // 2. Sistema de Verificação de Integridade (Gatilho Anti-Adulteração)
+    setInterval(function() {
+        const elemento = document.getElementById("sistema_copyright_protegido");
+        
+        // Verifica se o rodapé foi deletado, ocultado por CSS ou se mudaram o texto
+        if (!elemento || 
+            elemento.style.display === "none" || 
+            elemento.style.visibility === "hidden" || 
+            elemento.innerText.trim() !== textoOriginal) {
+            
+            // Se detectou alteração, apaga o aplicativo inteiro da tela e exibe erro fatal
+            document.body.innerHTML = `
+                <div style="color:#d9534f; text-align:center; margin-top:100px; font-family:'Segoe UI', sans-serif; padding:20px;">
+                    <span style="font-size:50px;">⚠️</span>
+                    <h2 style="margin-top:10px;">Erro Crítico de Integridade</h2>
+                    <p style="color:#333;">A licença de uso ou o código original deste aplicativo foi violado/adulterado.</p>
+                    <p style="font-size:13px; color:#666;">Por favor, utilize a versão oficial disponibilizada pelo desenvolvedor.</p>
+                </div>
+            `;
+            
+            // Trava qualquer outra execução de script
+            throw new Error("Aplicação violada. Execução interrompida.");
+        }
+    }, 2500); // Executa a checagem a cada 2,5 segundos
+});async function carregarHistoricoDaPlanilha() {
+    const loadingDiv = document.getElementById('loading_hist');
+    if (loadingDiv) loadingDiv.style.display = 'block';
+
+    const centro = document.getElementById('centro_selecionado')?.value || '';
+    
+    // Constrói a URL com o parâmetro de ação e o centro logado (se houver)
+    const url = `${URL_PLANILHA_GAS}?action=getHistory&centro=${encodeURIComponent(centro)}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Erro na requisição: ${response.status}`);
+        }
+
+        const dados = await response.json();
+
+        if (Array.isArray(dados)) {
+            const dadosNormalizados = dados.map(h => normalizarPedidoId(h));
+            // Salva no LocalStorage para acesso offline rápido posterior
+            localStorage.setItem('fast_request_history', JSON.stringify(dadosNormalizados));
+            
+            // Atualiza a variável global do app
+            historico = dadosNormalizados;
+            
+            // Renderiza novamente a tela do histórico com os dados novos
+            if (typeof renderHistory === 'function') {
+                renderHistory();
+            }
+            console.log('Histórico atualizado com sucesso da nuvem!');
+        } else {
+            console.error('O retorno da planilha não é um array válido:', dados);
+        }
+    } catch (error) {
+        console.error('Erro ao buscar histórico da nuvem:', error);
+        alert('Não foi possível sincronizar com a nuvem. Exibindo dados locais anteriores.');
+    } finally {
+        if (loadingDiv) loadingDiv.style.display = 'none';
+    }
+}
+</script>
+</body>
+</html>

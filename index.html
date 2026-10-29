@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gestão de pedidos - V15.07.2</title>
+    <title>Gestão de pedidos - V2.0</title>
     <style>
         :root { 
             --blue-dark: #001a33; 
@@ -75,11 +75,10 @@
         .btn-hist { padding: 10px 4px; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; color: white; text-align: center; display: inline-block; }
         .btn-hist:disabled { background: #bbb !important; color: #777 !important; cursor: not-allowed; }
         .btn-h-edit { background: #f0ad4e !important; }
-        .btn-h-planilha { background: var(--blue-main) !important; }
         .btn-h-wa { background: #25D366 !important; } 
         .btn-h-email { background: #0078d4 !important; }
-        .btn-h-csv { background: #333333 !important; grid-column: span 2;}
-        .btn-h-delete { background: var(--danger) !important; grid-column: span 2; }
+        .btn-h-csv { background: #333333 !important;}
+        .btn-h-delete { background: var(--danger) !important;}
 
         footer { padding: 10px 15px; background: #fff; border-top: 1px solid #eee; text-align: center; flex-shrink: 0; }
         .btn-confirm { background: #ccc; color: #fff; border: none; padding: 16px; width: 100%; font-weight: 800; border-radius: 12px; cursor: not-allowed; font-size: 16px; }
@@ -262,7 +261,7 @@
                     <div class="switch-container">
                         <span style="font-size: 13px; font-weight: bold; color: var(--blue-main);">É transformador?</span>
                         <label class="switch"><input type="checkbox" id="is_trafo" onchange="toggleTrafoField()"><span class="slider"></span></label>
-                        <div id="trafo_input_div" style="display:none; flex:1"><input type="number" id="trafo_serie" placeholder="Nº do Patrimônio"></div>
+                        <div id="trafo_input_div" style="display:none; flex:1"><input type="text" id="trafo_serie" placeholder="Nº do Patrimônio" oninput="this.value = this.value.replace(/\D/g, ''); validarBotaoAdicionar();"></div>
                     </div>
 
                     <div style="display:flex; gap:8px; align-items:flex-end">
@@ -555,6 +554,27 @@
         const chk = document.getElementById('is_trafo');
         if(chk) {
             document.getElementById('trafo_input_div').style.display = chk.checked ? 'block' : 'none';
+            validarBotaoAdicionar();
+        }
+    }
+
+    function validarBotaoAdicionar() {
+        const matBusca = document.getElementById('mat_busca').value;
+        const isTrafo = document.getElementById('is_trafo').checked;
+        const patrimonioVal = document.getElementById('trafo_serie').value.trim();
+        const btnAdd = document.getElementById('btn_add_mat');
+        if (!btnAdd) return;
+
+        if (!matBusca) {
+            btnAdd.disabled = true;
+            return;
+        }
+
+        if (isTrafo) {
+            const apenasNumeros = /^\d+$/.test(patrimonioVal);
+            btnAdd.disabled = !apenasNumeros;
+        } else {
+            btnAdd.disabled = false;
         }
     }
 
@@ -643,7 +663,7 @@
             document.getElementById('mat_busca').value = v1; 
             const cor = parseFloat(v3) > 0 ? 'green' : 'red';
             document.getElementById('mat_desc').innerHTML = `${v2} <br> <span style="color:${cor}">Saldo: ${v3 || 0}</span>`; 
-            document.getElementById('btn_add_mat').disabled = false; 
+            validarBotaoAdicionar();
         } else {
             const nomeEl = document.getElementById(m + '_nome');
             const matEl = document.getElementById(m + '_mat');
@@ -682,7 +702,10 @@
         document.getElementById('mat_busca').value = "";
         document.getElementById('mat_desc').innerText = "Nenhum item selecionado";
         document.getElementById('mat_qtd').value = "1";
-        document.getElementById('btn_add_mat').disabled = true;
+        document.getElementById('is_trafo').checked = false;
+        document.getElementById('trafo_serie').value = "";
+        document.getElementById('trafo_input_div').style.display = 'none';
+        validarBotaoAdicionar();
         renderList(); saveDraft();
     }
 
@@ -795,8 +818,6 @@
         const idValido = /^[A-Z]{4}\d{4}$/.test(idAtual);
         const idRepetiuFluxo = idFluxo && idAtual && idAtual === idFluxo;
 
-        // Guarda o identificador antigo da planilha para permitir excluir registros antigos,
-        // inclusive versões que usavam o ID do fluxo como ID do pedido.
         if (idAtual && (!idValido || idRepetiuFluxo)) {
             pedido.idPedidoOnlineOriginal = idAtual;
         }
@@ -850,8 +871,8 @@
         }
     }
 
-    function confirmarPedido() {
-        if(!confirm("Salvar pedido?")) return;
+    async function confirmarPedido() {
+        if(!confirm("Salvar pedido e enviar para a nuvem?")) return;
 
         const agora = new Date();
         const idPedidoGerado = pedidoEmEdicaoId || gerarIdPedidoAutomatico();
@@ -875,10 +896,32 @@
             tipo_sol: document.getElementById('tipo_sol_fake').value,
             data_exec_programada: document.getElementById('tipo_sol_fake').value === "Programada" ? document.getElementById('data_programada').value : "",
             itens: [...listaSolicitacao],
-            status: 'pendente'
+            status: 'efetivado'
         };
 
         novo = normalizarPedidoId(novo);
+
+        try {
+            const response = await fetch(URL_PLANILHA_GAS, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'salvarPedido',
+                    dados: novo
+                })
+            });
+
+            const result = await response.json();
+            if (!result || result.status !== 'success') {
+                throw new Error((result && result.message) ? result.message : 'Falha ao salvar pedido na planilha.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Aviso: O pedido foi salvo localmente, mas houve falha ao sincronizar com a nuvem.');
+            novo.status = 'pendente';
+        }
+
         historico.unshift(novo);
         localStorage.setItem('fast_request_history', JSON.stringify(historico));
 
@@ -889,87 +932,34 @@
     }
 
     async function carregarHistoricoDaPlanilha() {
+        const loadingDiv = document.getElementById('loading_hist');
+        if (loadingDiv) loadingDiv.style.display = 'block';
+
+        const centro = document.getElementById('centro_selecionado')?.value || '';
+        const url = `${URL_PLANILHA_GAS}?action=getHistory&centro=${encodeURIComponent(centro)}`;
+
         try {
-            const elCentro = document.getElementById('centro_selecionado');
-            const centroAtivo = elCentro ? elCentro.value : "";
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Erro na requisição: ${response.status}`);
+            }
 
-            const linkCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQi-2eq7mLOU1EGb9p9pGywQKNACF8jksbn3BHuSeKy0M3An5ovpZeeXgFvTnrM8-Ky5O6D24zyrfcN/pub?output=csv";
-            
-            const response = await fetch(linkCSV);
-            if (!response.ok) return;
-            
-            const textoCSV = await response.text();
-            const lines = textoCSV.split(/\r?\n/).slice(1); 
-            
-            let dadosFiltrados = [];
-            
-            lines.forEach(linha => {
-                if (!linha.trim()) return;
+            const dados = await response.json();
 
-                const c = inlineSplitCSV(linha);
-                if (c.length < 20) return; 
-                
-                const centroLinha = c[3] ? c[3].replace(/"/g, '').trim() : "";
-                if (!centroLinha) return;
-
-                if (centroAtivo && centroLinha.toLowerCase() !== centroAtivo.toLowerCase()) return; 
-                
-                dadosFiltrados.push({
-                    data: c[0] ? c[0].replace(/"/g, '').trim() : "",
-                    hora: c[1] ? c[1].replace(/"/g, '').trim() : "",
-                    projeto: c[2] ? c[2].replace(/"/g, '').trim() : "",
-                    centro: centroLinha,
-                    tipo_sol: c[4] ? c[4].replace(/"/g, '').trim() : "",
-                    data_exec_programada: c[5] ? c[5].replace(/"/g, '').trim() : "",
-                    solic: c[6] ? c[6].replace(/"/g, '').trim() : "",
-                    sol_mat: c[7] ? c[7].replace(/"/g, '').trim() : "",
-                    atend: c[8] ? c[8].replace(/"/g, '').trim() : "",
-                    atend_mat: c[9] ? c[9].replace(/"/g, '').trim() : "",
-                    processo: c[10] ? c[10].replace(/"/g, '').trim() : "",
-                    movim: c[11] ? c[11].replace(/"/g, '').trim() : "",
-                    mat_adm: c[12] ? c[12].replace(/"/g, '').trim() : "",
-                    reserva_num: c[13] ? c[13].replace(/"/g, '').trim() : "",
-                    id_fluxo: c[14] ? c[14].replace(/"/g, '').trim() : "",
-                    status: c[19] ? c[19].replace(/"/g, '').replace(/\r/g, '').trim() : 'efetivado',
-                    itens: [{
-                        cod: c[15] ? c[15].replace(/"/g, '').trim() : "",
-                        desc: c[16] ? c[16].replace(/"/g, '').trim() : "",
-                        qtd: c[17] ? c[17].replace(/"/g, '').trim() : "0",
-                        adm: c[18] ? c[18].replace(/"/g, '').trim() : "Não"
-                    }]
-                });
-            });
-
-            let historicoAgrupado = [];
-            dadosFiltrados.forEach(item => {
-                if (!item.id_fluxo) return;
-                let existente = historicoAgrupado.find(h => h.id_fluxo === item.id_fluxo);
-                if (existente) {
-                    const jaExisteItem = existente.itens.some(i => i.cod === item.itens[0].cod);
-                    if (!jaExisteItem) existente.itens.push(item.itens[0]);
-                } else {
-                    historicoAgrupado.push(item);
+            if (Array.isArray(dados)) {
+                const dadosNormalizados = dados.map(h => normalizarPedidoId(h));
+                localStorage.setItem('fast_request_history', JSON.stringify(dadosNormalizados));
+                historico = dadosNormalizados;
+                if (typeof renderHistory === 'function') {
+                    renderHistory();
                 }
-            });
-
-            let historicoLocal = [];
-            try {
-                const localData = localStorage.getItem('fast_request_history');
-                if (localData) historicoLocal = JSON.parse(localData);
-            } catch(e) { console.error(e); }
-            
-            const pendentesLocais = historicoLocal.filter(h => {
-                if (!h || h.status !== 'pendente') return false;
-                if (centroAtivo && h.centro && h.centro.toLowerCase() !== centroAtivo.toLowerCase()) return false;
-                return true;
-            });
-
-            historico = [...pendentesLocais, ...historicoAgrupado].map(h => normalizarPedidoId(h));
-            localStorage.setItem('fast_request_history', JSON.stringify(historico));
-            
-            renderHistory();
-        } catch (error) { 
-            console.error("Erro ao carregar o histórico:", error); 
+            } else {
+                console.error('O retorno da planilha não é um array válido:', dados);
+            }
+        } catch (error) {
+            console.error('Erro ao buscar histórico da nuvem:', error);
+        } finally {
+            if (loadingDiv) loadingDiv.style.display = 'none';
         }
     }
 
@@ -1046,8 +1036,6 @@
                     const solDataExec = h.tipo_sol === "Programada" && h.data_exec_programada ? `<br><b>Data Programada Execução:</b> ${h.data_exec_programada.split('-').reverse().join('/')}` : '';
                     
                     const isEfetivado = h.status === 'efetivado';
-                    const btnLabel = isEfetivado ? '✅ Sincronizado' : 'Salvar Planilha';
-                    const btnDisabled = isEfetivado ? 'disabled' : '';
 
                     return `
                     <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fafafa;">
@@ -1083,13 +1071,12 @@
                                 `).join('') : '<tr><td colspan="4">Sem itens cadastrados</td></tr>'}
                             </tbody>
                         </table>
-                        <div class="hist-actions">
+                        <div class="hist-actions" style="grid-template-columns: repeat(5, 1fr);">
                             <button class="btn-hist btn-h-edit" onclick="acaoEditarEExcluirDoHistorico(${indexReal})">✏️ Editar</button>
-                            <button class="btn-hist btn-h-planilha" ${btnDisabled} onclick="efetivarPedido(${indexReal}, this)">${btnLabel}</button>
                             <button class="btn-hist btn-h-wa" onclick="reutilizarWA(${indexReal})">WhatsApp</button>
                             <button class="btn-hist btn-h-email" onclick="direcionarParaEmail(${indexReal})">📧 E-mail</button>
                            <button class="btn-hist btn-h-csv" onclick="exportarParaCSV(${indexReal})">💾 Gerar CSV</button>
-                           <button class="btn-hist btn-h-delete" onclick="deletarPedidoOnline(${indexReal})">🗑️ Excluir pedido</button>
+                           <button class="btn-hist btn-h-delete" onclick="deletarPedidoOnline(${indexReal})">🗑️ Excluir</button>
                         </div>
                     </div>
                     `;
@@ -1186,107 +1173,19 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
         document.body.removeChild(link);
     }
 
-    async function efetivarPedido(indexReal, btnEl) {
-        let pedidoParaEnviar;
-
-        if (indexReal !== undefined && indexReal !== null && historico[indexReal]) {
-            pedidoParaEnviar = JSON.parse(JSON.stringify(historico[indexReal]));
-        } else {
-            if (listaSolicitacao.length === 0) { alert("Nenhum item na lista!"); return; }
-            const agora = new Date();
-            const idPedidoGerado = pedidoEmEdicaoId || gerarIdPedidoAutomatico();
-
-            pedidoParaEnviar = {
-                id: idPedidoGerado,
-                idPedido: idPedidoGerado,
-                data: agora.toLocaleDateString('pt-BR'),
-                hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                projeto: document.getElementById('projeto').value.toUpperCase(),
-                solic: document.getElementById('sol_nome').value,
-                sol_mat: document.getElementById('sol_mat').value,
-                atend: document.getElementById('ate_nome').value,
-                atend_mat: document.getElementById('ate_mat').value,
-                processo: document.getElementById('processo').value,
-                movim: document.getElementById('movimentacao').value,
-                reserva_num: document.getElementById('reserva_num').value,
-                id_fluxo: document.getElementById('id_fluxo').value,
-                mat_adm: document.getElementById('mat_adm').value,
-                centro: document.getElementById('centro_selecionado').value,
-                tipo_sol: document.getElementById('tipo_sol_fake').value,
-                data_exec_programada: document.getElementById('tipo_sol_fake').value === "Programada" ? document.getElementById('data_programada').value : "",
-                status: 'pendente',
-                itens: [...listaSolicitacao]
-            };
-        }
-
-        pedidoParaEnviar = normalizarPedidoId(pedidoParaEnviar);
-
-        const btn = btnEl || document.getElementById('btn_enviar');
-        if(btn) { btn.disabled = true; btn.innerText = "Enviando..."; }
-
-        pedidoParaEnviar.itens = pedidoParaEnviar.itens.map(i => {
-            let qtdTratada = i.qtd ? String(i.qtd).replace(/[\r\n]/g, '').trim() : "1";
-            return {
-                cod: i.cod ? String(i.cod).replace(/[\r\n]/g, '').trim() : "",
-                desc: i.desc ? String(i.desc).replace(/[\r\n]/g, '').trim() : "",
-                qtd: qtdTratada,
-                adm: i.adm || "Não"
-            };
-        });
-
-        try {
-            const response = await fetch(URL_PLANILHA_GAS, {
-                method: 'POST',
-                redirect: 'follow',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                    action: 'salvarPedido',
-                    dados: pedidoParaEnviar
-                })
-            });
-
-            const result = await response.json();
-
-            if (!result || result.status !== 'success') {
-                throw new Error((result && result.message) ? result.message : 'Falha ao salvar pedido na planilha.');
-            }
-
-            // Mantém o ID gerado no aplicativo. Não sobrescreve com retorno do Apps Script.
-            pedidoParaEnviar = normalizarPedidoId(pedidoParaEnviar);
-            pedidoParaEnviar.status = 'efetivado';
-
-            if (indexReal !== undefined && indexReal !== null && historico[indexReal]) {
-                historico[indexReal] = pedidoParaEnviar;
-            } else {
-                historico.unshift(pedidoParaEnviar);
-                listaSolicitacao = [];
-            }
-
-            pedidoEmEdicaoId = "";
-            localStorage.setItem('fast_request_history', JSON.stringify(historico));
-            alert("Pedido sincronizado com sucesso!");
-            renderList();
-            renderHistory();
-        } catch (e) {
-            console.error(e);
-            alert(`Mantido em cache local. Falha ao enviar.`);
-
-            if (indexReal === undefined || indexReal === null) {
-                pedidoParaEnviar.status = 'pendente';
-                historico.unshift(pedidoParaEnviar);
-                localStorage.setItem('fast_request_history', JSON.stringify(historico));
-            }
-
-            renderHistory();
-        } finally {
-            if(btn && (!pedidoParaEnviar || pedidoParaEnviar.status !== 'efetivado')) {
-                btn.disabled = false;
-                btn.innerText = "Salvar Planilha";
-            }
-        }
-    }
-
     async function deletarPedidoOnline(i) {
+        const senhaDigitada = prompt("Digite a senha para autorizar a exclusão:");
+        const SENHA_MESTRE = "1505";
+
+        if (senhaDigitada === null) {
+            return;
+        }
+
+        if (senhaDigitada !== SENHA_MESTRE) {
+            alert("Você não tem permissão para executar esta ação.");
+            return;
+        }
+
         const pedido = historico[i];
         if (!pedido) return;
 
@@ -1399,22 +1298,18 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
         corpoEmail += `\n\nITENS SOLICITADOS:\n`;
         corpoEmail += `CODIGO - DESCRICAO - QUANTIDADE\n`;
 
-        // Formato identico ao do WhatsApp
         h.itens.forEach(m => {
             corpoEmail += `${m.cod} - ${m.desc}${m.adm === 'Sim' ? ' *(ADM)*' : ''} - ${m.qtd}\n`;
         });
         
         corpoEmail += `\nAtenciosamente,\n${h.solic || '---'}.`;
 
-        // Pergunta ao usuário qual versão do Outlook ele deseja usar
         const usarAplicativo = confirm("Deseja abrir no Aplicativo do Outlook?\n\n(Clique em 'Cancelar' para abrir o Outlook Web)");
 
         if (usarAplicativo) {
-            // Abre o aplicativo nativo do sistema usando mailto:
             const mailtoUrl = `mailto:?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
             window.location.href = mailtoUrl;
         } else {
-            // Abre o Outlook Web no navegador preenchendo tudo automaticamente
             const urlOutlookWeb = `https://outlook.office.com/mail/deeplink/compose?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
             window.open(urlOutlookWeb, '_blank');
         }
@@ -1543,32 +1438,25 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
             location.reload(); 
         } 
     }document.addEventListener("DOMContentLoaded", function() {
-    // Texto em Base64 para ocultar: "Aplicativo desenvolvido por Leicler Marvim"
     const infoCripto = "QXBsaWNhdGl2byBkZXNlbnZvbHZpZG8gcG9yIExlaWNsZXIgTWFydmlt";
     const textoOriginal = atob(infoCripto);
     
-    // 1. Cria o elemento de rodapé dinamicamente com os novos estilos (itálico e opacidade)
     const rodape = document.createElement("div");
     rodape.id = "sistema_copyright_protegido";
-    // Adicionado font-style: italic e opacity: 0.55 para ficar bem discreto
     rodape.style.cssText = "text-align:center; padding:12px; font-size:11px; color:#777; background:#ffffff; border-top:1px solid #ddd; font-weight:bold; font-style:italic; opacity:0.55; position:relative; z-index:9999; font-family:'Segoe UI', sans-serif;";
     rodape.innerText = textoOriginal;
     
-    // Insere o rodapé dentro do container principal (.app)
     const appContainer = document.querySelector(".app") || document.body;
     appContainer.appendChild(rodape);
 
-    // 2. Sistema de Verificação de Integridade (Gatilho Anti-Adulteração)
     setInterval(function() {
         const elemento = document.getElementById("sistema_copyright_protegido");
         
-        // Verifica se o rodapé foi deletado, ocultado por CSS ou se mudaram o texto
         if (!elemento || 
             elemento.style.display === "none" || 
             elemento.style.visibility === "hidden" || 
             elemento.innerText.trim() !== textoOriginal) {
             
-            // Se detectou alteração, apaga o aplicativo inteiro da tela e exibe erro fatal
             document.body.innerHTML = `
                 <div style="color:#d9534f; text-align:center; margin-top:100px; font-family:'Segoe UI', sans-serif; padding:20px;">
                     <span style="font-size:50px;">⚠️</span>
@@ -1578,50 +1466,10 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
                 </div>
             `;
             
-            // Trava qualquer outra execução de script
             throw new Error("Aplicação violada. Execução interrompida.");
         }
-    }, 2500); // Executa a checagem a cada 2,5 segundos
-});async function carregarHistoricoDaPlanilha() {
-    const loadingDiv = document.getElementById('loading_hist');
-    if (loadingDiv) loadingDiv.style.display = 'block';
-
-    const centro = document.getElementById('centro_selecionado')?.value || '';
-    
-    // Constrói a URL com o parâmetro de ação e o centro logado (se houver)
-    const url = `${URL_PLANILHA_GAS}?action=getHistory&centro=${encodeURIComponent(centro)}`;
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Erro na requisição: ${response.status}`);
-        }
-
-        const dados = await response.json();
-
-        if (Array.isArray(dados)) {
-            const dadosNormalizados = dados.map(h => normalizarPedidoId(h));
-            // Salva no LocalStorage para acesso offline rápido posterior
-            localStorage.setItem('fast_request_history', JSON.stringify(dadosNormalizados));
-            
-            // Atualiza a variável global do app
-            historico = dadosNormalizados;
-            
-            // Renderiza novamente a tela do histórico com os dados novos
-            if (typeof renderHistory === 'function') {
-                renderHistory();
-            }
-            console.log('Histórico atualizado com sucesso da nuvem!');
-        } else {
-            console.error('O retorno da planilha não é um array válido:', dados);
-        }
-    } catch (error) {
-        console.error('Erro ao buscar histórico da nuvem:', error);
-        alert('Não foi possível sincronizar com a nuvem. Exibindo dados locais anteriores.');
-    } finally {
-        if (loadingDiv) loadingDiv.style.display = 'none';
-    }
-}
+    }, 2500);
+});
 </script>
 </body>
 </html>

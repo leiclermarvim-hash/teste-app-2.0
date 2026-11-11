@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gestão de pedidos - V2.0</title>
+    <title>Gestão de pedidos - V15.07.2</title>
     <style>
         :root { 
             --blue-dark: #001a33; 
@@ -46,8 +46,8 @@
         .cascata-group label { font-size: 11px; color: #666; margin-bottom: 0; }
         .cascata-group select { padding: 8px; font-size: 14px; }
 
-        .switch-container { display: flex; align-items: center; gap: 10px; margin: 10px 0; background: #fff; padding: 8px; border-radius: 8px; border: 1px solid #ddd; }
-        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch-container { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; background: #fff; padding: 10px 12px; border-radius: 10px; border: 1px solid #ddd; width: 100%; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; flex-shrink: 0; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 22px; }
         .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
@@ -85,17 +85,54 @@
         .btn-confirm.active { background: var(--accent); cursor: pointer; }
 
         .search-results { position: absolute; background: white; width: 100%; left: 0; z-index: 999; border: 1px solid #ccc; display: none; max-height: 200px; overflow-y: auto; border-radius: 10px; }
-        .condicional-fields { display: none; flex-direction: column; gap: 8px; margin-top: 12px; border-left: 3px solid var(--blue-main); padding-left: 10px; }
+        .condicional-fields { display: none; flex-direction: column; gap: 8px; margin-top: 8px; border-left: 3px solid var(--blue-main); padding-left: 10px; }
         
         .filter-section { display: flex; flex-direction: column; gap: 8px; background: #f1f3f5; padding: 10px; border-radius: 10px; margin-bottom: 12px; }
         .filter-controls { display: flex; gap: 6px; }
+
+        /* Overlay de Bloqueio da Interface */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.65);
+            z-index: 99999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            backdrop-filter: blur(3px);
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
 
+<!-- Overlay de Bloqueio para evitar Ações Acidentais durante Comunicação de Rede -->
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <h3 id="loading-text" style="margin: 0; font-size: 16px;">Processando dados, por favor aguarde...</h3>
+    <p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Não feche ou atualize a página.</p>
+</div>
+
 <div class="app">
     <header>
-        <strong>FAST REQUEST PRO</strong><br><small>Gestão de pedidos | V2.0</small>
+        <strong>FAST REQUEST PRO</strong><br><small>Gestão de pedidos | V15.07.2</small>
         <button class="btn-top" onclick="confirmReset()">LIMPAR</button>
     </header>
 
@@ -211,8 +248,15 @@
                             <option> Atendimento a clientes - DDM</option>
                         </select>
                     </div>
-                    <div><label>Saída Geral ADM?</label><select id="mat_adm" onchange="executarLogicaGeralAdm()"><option value="Não">Não</option><option value="Sim">Sim</option></select></div>
+                    
+                    <div style="grid-column: span 2;">
+                        <div class="switch-container" style="margin: 0;">
+                            <span style="font-size: 13px; font-weight: bold; color: var(--blue-main);">Saída Geral ADM?</span>
+                            <label class="switch"><input type="checkbox" id="mat_adm" onchange="executarLogicaGeralAdm()"><span class="slider"></span></label>
+                        </div>
+                    </div>
                 </div>
+
                 <div style="margin-bottom:12px"><label>Tipo de Movimentação:</label>
                     <select id="movimentacao">
                         <option value="Z61 - Saída de material">Z61 - Saída de material</option>
@@ -220,11 +264,14 @@
                         <option value="Z6D - Devolução de sucata">Z6D - Devolução de sucata</option>
                     </select>
                 </div>
-                <div style="margin-bottom:12px"><label>Deseja informar a reserva?</label>
-                    <select id="reserva" onchange="toggleCondicionalFields(); saveDraft()"><option value="Não">Não</option><option value="Sim">Sim</option></select>
+
+                <div class="switch-container">
+                    <span style="font-size: 13px; font-weight: bold; color: var(--blue-main);">Deseja informar a reserva?</span>
+                    <label class="switch"><input type="checkbox" id="reserva" onchange="toggleCondicionalFields(); saveDraft()"><span class="slider"></span></label>
                 </div>
+
                 <div id="campos_condicionais" class="condicional-fields">
-                    <div><label>ID do fluxo:</label><input type="text" id="id_fluxo"></div>
+                    <div><label>ID do fluxo:</label><input type="text" id="id_fluxo" oninput="this.value = this.value.toUpperCase()"></div>
                     <div><label>Reserva:</label><input type="text" id="reserva_num"></div>
                 </div>
             </div>
@@ -232,12 +279,9 @@
             <div class="material-box">
                 <span class="section-title">📦 Seleção de Itens</span>
 
-                <div style="margin-bottom: 12px;">
-                    <label>Modo de inserção:</label>
-                    <select id="is_kit_option" onchange="toggleKitSearch()">
-                        <option value="Não">Material Individual</option>
-                        <option value="Sim">Kit por Cascata Técnica</option>
-                    </select>
+                <div class="switch-container" style="margin-bottom: 12px;">
+                    <span style="font-size: 13px; font-weight: bold; color: var(--blue-main);">Kit por Cascata Técnica?</span>
+                    <label class="switch"><input type="checkbox" id="is_kit_option" onchange="toggleKitSearch()"><span class="slider"></span></label>
                 </div>
 
                 <div id="kit_cascata_div" style="display:none; margin-bottom: 15px;">
@@ -250,6 +294,12 @@
                         <label>6. Dan (H):</label><select id="c_dan" onchange="filtrarCascata(6)" disabled></select>
                         <label>7. Tipo Cabo (I):</label><select id="c_cab" onchange="filtrarCascata(7)" disabled></select>
                     </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label>Multiplicador (Qtd. de Conjuntos):</label>
+                        <input type="text" id="kit_multiplicador" value="1" oninput="formatQtd(this)">
+                    </div>
+
                     <button id="btn_add_kit" class="btn-add" style="background:var(--accent); display:none" onclick="adicionarKitCascata()">INSERIR MATERIAIS DO KIT</button>
                 </div>
 
@@ -258,10 +308,12 @@
                     <div style="position:relative"><input type="text" id="mat_busca" placeholder="Código ou descrição..." onkeyup="searchData('mat')" autocomplete="off"><div id="mat_results" class="search-results"></div></div>
                     <div id="mat_desc" style="font-size:14px; color:#000; margin:8px 0; font-weight:bold; line-height:1.2;">Nenhum item selecionado</div>
 
-                    <div class="switch-container">
+                    <div class="switch-container" style="margin-bottom: 8px;">
                         <span style="font-size: 13px; font-weight: bold; color: var(--blue-main);">É transformador?</span>
                         <label class="switch"><input type="checkbox" id="is_trafo" onchange="toggleTrafoField()"><span class="slider"></span></label>
-                        <div id="trafo_input_div" style="display:none; flex:1"><input type="text" id="trafo_serie" placeholder="Nº do Patrimônio" oninput="this.value = this.value.replace(/\D/g, ''); validarBotaoAdicionar();"></div>
+                    </div>
+                    <div id="trafo_input_div" style="display:none; margin-bottom: 8px;">
+                        <input type="text" id="trafo_serie" placeholder="Nº do Patrimônio" oninput="this.value = this.value.replace(/\D/g, ''); validarBotaoAdicionar();">
                     </div>
 
                     <div style="display:flex; gap:8px; align-items:flex-end">
@@ -351,9 +403,10 @@
 
         renderBases();
         executarLogicaGeralAdm();
+        toggleCondicionalFields();
+        toggleKitSearch();
         toggleCalendarioProgramada();
 
-        // Força a atualização do GitHub e histórico ao carregar/atualizar a página sem afetar o rascunho
         await updateBaseFromGithub(true); 
         carregarHistoricoDaPlanilha();
     };
@@ -362,7 +415,7 @@
         try {
             const el = document.getElementById('mat_adm');
             if (!el) return;
-            const IsGeralAdm = el.value === "Sim";
+            const IsGeralAdm = el.checked;
             if (IsGeralAdm) {
                 listaSolicitacao.forEach(item => item.adm = "Sim");
             }
@@ -400,13 +453,14 @@
     function toggleKitSearch() {
         const opt = document.getElementById('is_kit_option');
         if(!opt) return;
-        const isKit = opt.value === "Sim";
+        const isKit = opt.checked;
         document.getElementById('kit_cascata_div').style.display = isKit ? 'block' : 'none';
         document.getElementById('manual_search_div').style.display = isKit ? 'none' : 'block';
         if(isKit && db.kitBase && db.kitBase.length > 0) {
             popularSelect('c_est', [...new Set(db.kitBase.map(x => x.est))]);
             document.getElementById('c_est').disabled = false;
         }
+        saveDraft();
     }
 
     function popularSelect(id, opcoes) {
@@ -468,6 +522,9 @@
             cab: document.getElementById('c_cab').value
         };
 
+        const multInput = document.getElementById('kit_multiplicador')?.value || "1";
+        const multiplicador = parseFloat(multInput.replace(',', '.')) || 1;
+
         let materiaisDoKit = (db.kitBase || []).filter(x => 
             (!sel.est || x.est === sel.est) && (!sel.red || x.red === sel.red) && 
             (!sel.pos || x.pos === sel.pos) && (!sel.niv || x.niv === sel.niv) && 
@@ -485,7 +542,7 @@
             materiaisDoKit = db.kitBase.filter(x => x.codigoKit === codigoDoKitSelecionado);
         }
 
-        const itemAdm = document.getElementById('mat_adm').value;
+        const itemAdm = document.getElementById('mat_adm').checked ? "Sim" : "Não";
 
         materiaisDoKit.forEach(it => {
             const cod = it.matCod ? it.matCod.replace(/[\r\n]/g, '').trim() : "";
@@ -495,19 +552,20 @@
             let descReal = materialOficial ? materialOficial.desc : (it.matDescOriginal || "MATERIAL TÉCNICO");
             descReal = descReal.replace(/[\r\n]/g, '').trim();
             
-            const qtdLimpa = it.matQtd ? it.matQtd.replace(/[\r\n]/g, '').trim() : "1";
+            const qtdBaseLimpa = it.matQtd ? it.matQtd.replace(/[\r\n]/g, '').trim() : "1";
+            const qtdBaseNum = parseFloat(qtdBaseLimpa.replace(',', '.')) || 1;
+            const qtdTotalAdicionar = qtdBaseNum * multiplicador;
 
             let itemExistente = listaSolicitacao.find(x => x.cod === cod);
             if (itemExistente) {
                 let qtdAtual = parseFloat(itemExistente.qtd.toString().replace(',', '.')) || 0;
-                let qtdNum = parseFloat(qtdLimpa.replace(',', '.')) || 1;
-                let novaQtd = qtdAtual + qtdNum;
+                let novaQtd = qtdAtual + qtdTotalAdicionar;
                 itemExistente.qtd = novaQtd.toString().replace('.', ',');
             } else {
                 listaSolicitacao.push({
                     cod: cod,
                     desc: descReal, 
-                    qtd: qtdLimpa.replace('.', ','), 
+                    qtd: qtdTotalAdicionar.toString().replace('.', ','), 
                     adm: itemAdm
                 });
             }
@@ -515,7 +573,7 @@
 
         renderList();
         validarForm();
-        alert("Materiais do kit inseridos com sucesso!");
+        alert(`Materiais do kit inseridos com sucesso! (Multiplicador: x${multiplicador})`);
     }
 
     function formatQtd(el) {
@@ -595,7 +653,7 @@
     function toggleCondicionalFields() {
         const res = document.getElementById('reserva');
         if(res) {
-            document.getElementById('campos_condicionais').style.display = (res.value === "Sim") ? 'flex' : 'none';
+            document.getElementById('campos_condicionais').style.display = res.checked ? 'flex' : 'none';
         }
     }
 
@@ -604,12 +662,16 @@
             const d = {
                 sol_nome: document.getElementById('sol_nome').value, sol_mat: document.getElementById('sol_mat').value,
                 ate_nome: document.getElementById('ate_nome').value, ate_mat: document.getElementById('ate_mat').value,
-                projeto: document.getElementById('projeto').value, reserva: document.getElementById('reserva').value,
+                projeto: document.getElementById('projeto').value, reserva: document.getElementById('reserva').checked ? "Sim" : "Não",
                 processo: document.getElementById('processo').value, centro_selecionado: document.getElementById('centro_selecionado').value,
                 centro_busca: document.getElementById('centro_busca').value, itens: listaSolicitacao,
                 movimentacao: document.getElementById('movimentacao').value,
                 tipo_sol: document.getElementById('tipo_sol_fake').value,
-                data_prog: document.getElementById('data_programada').value
+                data_prog: document.getElementById('data_programada').value,
+                mat_adm: document.getElementById('mat_adm').checked ? "Sim" : "Não",
+                is_kit: document.getElementById('is_kit_option').checked ? "Sim" : "Não",
+                id_fluxo: document.getElementById('id_fluxo').value,
+                reserva_num: document.getElementById('reserva_num').value
             };
             localStorage.setItem('fast_request_draft', JSON.stringify(d));
             validarForm();
@@ -678,7 +740,7 @@
         const cod = document.getElementById('mat_busca').value;
         const descOriginal = document.getElementById('mat_desc').innerText.split('\n')[0];
         const qtdRaw = document.getElementById('mat_qtd').value;
-        const globalIsAdm = document.getElementById('mat_adm').value === "Sim";
+        const globalIsAdm = document.getElementById('mat_adm').checked;
         const itemAdm = globalIsAdm ? "Sim" : "Não";
         const isTrafo = document.getElementById('is_trafo').checked;
         const numSerie = document.getElementById('trafo_serie').value;
@@ -719,7 +781,7 @@
         }
 
         const centroAtivo = document.getElementById('centro_selecionado').value;
-        const isGeralAdm = document.getElementById('mat_adm').value === "Sim";
+        const isGeralAdm = document.getElementById('mat_adm').checked;
 
         let htmlHeader = `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; font-size: 11px; font-weight: bold; color: var(--blue-main); text-transform: uppercase; border-bottom: 2px solid #ddd; margin-top: 10px; gap: 10px;">
@@ -791,7 +853,6 @@
         btn.disabled = !ok; btn.classList.toggle('active', ok);
     }
 
-
     function gerarIdPedidoAutomatico() {
         const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         let tentativas = 0;
@@ -843,36 +904,15 @@
         ).trim();
     }
 
-    async function excluirPedidoOnlineSilencioso(idPedido) {
-        if (!idPedido) return true;
-
-        try {
-            const response = await fetch(URL_PLANILHA_GAS, {
-                method: 'POST',
-                redirect: 'follow',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                    action: 'deletarPedido',
-                    idPedido: idPedido
-                })
-            });
-
-            const result = await response.json();
-
-            if (!result || result.status !== 'success') {
-                throw new Error((result && result.message) ? result.message : 'Falha ao excluir pedido na planilha.');
-            }
-
-            return true;
-        } catch (error) {
-            console.error(error);
-            alert('Não foi possível excluir o pedido on-line para edição: ' + error.message + '\n\nO pedido não foi carregado para edição para evitar duplicidade.');
-            return false;
-        }
-    }
-
     async function confirmarPedido() {
         if(!confirm("Salvar pedido e enviar para a nuvem?")) return;
+
+        const overlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        if (overlay) {
+            if (loadingText) loadingText.innerText = "Salvando e enviando pedido para a nuvem...";
+            overlay.style.display = 'flex';
+        }
 
         const agora = new Date();
         const idPedidoGerado = pedidoEmEdicaoId || gerarIdPedidoAutomatico();
@@ -891,7 +931,7 @@
             movim: document.getElementById('movimentacao').value,
             reserva_num: document.getElementById('reserva_num').value,
             id_fluxo: document.getElementById('id_fluxo').value,
-            mat_adm: document.getElementById('mat_adm').value,
+            mat_adm: document.getElementById('mat_adm').checked ? "Sim" : "Não",
             centro: document.getElementById('centro_selecionado').value,
             tipo_sol: document.getElementById('tipo_sol_fake').value,
             data_exec_programada: document.getElementById('tipo_sol_fake').value === "Programada" ? document.getElementById('data_programada').value : "",
@@ -920,9 +960,17 @@
             console.error(e);
             alert('Aviso: O pedido foi salvo localmente, mas houve falha ao sincronizar com a nuvem.');
             novo.status = 'pendente';
+        } finally {
+            if (overlay) overlay.style.display = 'none';
         }
 
-        historico.unshift(novo);
+        const indexExistente = historico.findIndex(h => h.id === novo.id || h.idPedido === novo.id);
+        if (indexExistente !== -1) {
+            historico[indexExistente] = novo;
+        } else {
+            historico.unshift(novo);
+        }
+
         localStorage.setItem('fast_request_history', JSON.stringify(historico));
 
         pedidoEmEdicaoId = "";
@@ -1085,28 +1133,15 @@
         }).join('');
     }
 
-    async function acaoEditarEExcluirDoHistorico(i) {
+    function acaoEditarEExcluirDoHistorico(i) {
         if (!historico[i]) return;
 
         const pedido = normalizarPedidoId(historico[i]);
         const idPedidoTela = pedido.idPedido || pedido.id || "";
-        const idParaExcluirOnline = obterIdOnlineParaExcluir(pedido);
         const projeto = pedido.projeto || "---";
 
-        const mensagem = `Deseja editar este pedido?
-
-ID Pedido: ${idPedidoTela || '---'}
-Projeto/OSM: ${projeto}
-
-Ao clicar em OK, o sistema tentará excluir o pedido da planilha on-line e carregará os dados na aba NOVO para edição.
-
-Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidade.`;
+        const mensagem = `Deseja carregar este pedido para edição?\n\nID Pedido: ${idPedidoTela || '---'}\nProjeto/OSM: ${projeto}\n\nOs dados serão carregados na aba NOVO. A nuvem só será atualizada quando você clicar em CONFIRMAR.`;
         if (!confirm(mensagem)) return;
-
-        if (idParaExcluirOnline) {
-            const excluiuOnline = await excluirPedidoOnlineSilencioso(idParaExcluirOnline);
-            if (!excluiuOnline) return;
-        }
 
         pedidoEmEdicaoId = idPedidoTela || gerarIdPedidoAutomatico();
 
@@ -1119,17 +1154,16 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
         document.getElementById('movimentacao').value = pedido.movim || "Z61 - Saída de material";
         document.getElementById('reserva_num').value = pedido.reserva_num || "";
         document.getElementById('id_fluxo').value = pedido.id_fluxo || "";
-        document.getElementById('mat_adm').value = pedido.mat_adm || "Não";
+        document.getElementById('mat_adm').checked = (pedido.mat_adm === "Sim");
         document.getElementById('centro_selecionado').value = pedido.centro || "";
         document.getElementById('centro_busca').value = pedido.centro || "";
         document.getElementById('tipo_sol_fake').value = pedido.tipo_sol || "OSM";
         document.getElementById('data_programada').value = pedido.data_exec_programada || "";
 
-        document.getElementById('reserva').value = (pedido.reserva_num || pedido.id_fluxo) ? "Sim" : "Não";
+        const temReserva = !!(pedido.reserva_num || pedido.id_fluxo || pedido.reserva === "Sim");
+        document.getElementById('reserva').checked = temReserva;
+        
         listaSolicitacao = [...(pedido.itens || [])];
-
-        historico.splice(i, 1);
-        localStorage.setItem('fast_request_history', JSON.stringify(historico));
 
         toggleCondicionalFields();
         toggleCalendarioProgramada();
@@ -1177,9 +1211,7 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
         const senhaDigitada = prompt("Digite a senha para autorizar a exclusão:");
         const SENHA_MESTRE = "1505";
 
-        if (senhaDigitada === null) {
-            return;
-        }
+        if (senhaDigitada === null) return;
 
         if (senhaDigitada !== SENHA_MESTRE) {
             alert("Você não tem permissão para executar esta ação.");
@@ -1202,6 +1234,13 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
             localStorage.setItem('fast_request_history', JSON.stringify(historico));
             renderHistory();
             return;
+        }
+
+        const overlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        if (overlay) {
+            if (loadingText) loadingText.innerText = "Excluindo pedido da nuvem, aguarde...";
+            overlay.style.display = 'flex';
         }
 
         try {
@@ -1228,8 +1267,11 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
         } catch (error) {
             console.error(error);
             alert('Não foi possível excluir o pedido na planilha on-line: ' + error.message);
+        } finally {
+            if (overlay) overlay.style.display = 'none';
         }
     }
+
     function reutilizarWA(i) {
         const h = historico[i]; 
         if (!h || !h.itens || h.itens.length === 0) return;
@@ -1270,30 +1312,34 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
         const h = historico[i];
         if (!h || !h.itens || h.itens.length === 0) return;
 
+        const DESTINATARIOS_PADRAO = "beatriz.reis@enel.com, sulaima.paulo@mroativa.com.br, matheus.braga@enel.com, blenda.elba@mroativa.com.br, wanderson.nunes@mroativa.com.br";
+        const COPIA_PADRAO = "weslen.souza@enel.com, magnum.santos@enel.com, leicler.barreto@enel.com, fabricia.manhaes@mroativa.com.br, daniel.barreto@mroativa.com.br, gabriel.barbosa@mroativa.com.br, felipe.moraes@mroativa.com.br, luiz.silva@mroativa.com.br, thales.melo@mroativa.com.br, rulyan.paes@mroativa.com.br, AlmoxarifadoBMUB@enelcom.onmicrosoft.com, georgia.martins@enel.com,  matheus.ribeiro@enel.com, vinicius.azevedo2@enel.com;
+
         const dataProgFormatada = (h.tipo_sol === "Programada" && h.data_exec_programada) 
             ? h.data_exec_programada.split('-').reverse().join('/') 
             : '---';
 
-	const mesmoSolicitanteEAtendente =
-   		 String(h.sol_mat || '').trim() !== '' &&
-   		 String(h.atend_mat || '').trim() !== '' &&
-   		 String(h.sol_mat || '').trim() === String(h.atend_mat || '').trim();
+        const mesmoSolicitanteEAtendente =
+            String(h.sol_mat || '').trim() !== '' &&
+            String(h.atend_mat || '').trim() !== '' &&
+            String(h.sol_mat || '').trim() === String(h.atend_mat || '').trim();
 
         const assunto = `Projeto: ${h.projeto || '---'} / Reserva: ${h.reserva_num || '---'} / Processo: ${h.processo}`;        
         let corpoEmail = `Prezados,\nSegue abaixo o escopo detalhado da nova solicitação:\n\n`;
-	corpoEmail += `Solicitante: ${h.solic || '---'} (Matrícula: ${h.sol_mat || '---'})\n`;
-      		 if (!mesmoSolicitanteEAtendente) {
-   			 corpoEmail += `Atendente: ${h.atend || '---'} (Matrícula: ${h.atend_mat || '---'})\n`;}
-	corpoEmail += `Data Emissão: ${h.data || '---'} às ${h.hora || '--:--'}\n`;
+        corpoEmail += `Solicitante: ${h.solic || '---'} (Matrícula: ${h.sol_mat || '---'})\n`;
+        if (!mesmoSolicitanteEAtendente) {
+            corpoEmail += `Atendente: ${h.atend || '---'} (Matrícula: ${h.atend_mat || '---'})\n`;
+        }
+        corpoEmail += `Data Emissão: ${h.data || '---'} às ${h.hora || '--:--'}\n`;
         corpoEmail += `PROJETO / OSM: ${h.projeto || '---'}\n`;
-	corpoEmail += `Nº Reserva: ${h.reserva_num || '---'}\n`;
+        corpoEmail += `Nº Reserva: ${h.reserva_num || '---'}\n`;
         if (h.id_fluxo) corpoEmail += `ID do Fluxo: ${h.id_fluxo}\n`;
-	corpoEmail += `Tipo de Solicitação: ${h.tipo_sol || 'OSM'}\n`;
-	corpoEmail += `Centro Operacional: Centro ${h.centro || '---'}\n`;
-	corpoEmail += `Processo: ${h.processo || '---'}\n`;
-	
-	corpoEmail += `Movimentação: ${h.movim || '---'}\n`;
-        if (h.tipo_sol === "Programada") {corpoEmail += `Data de Execução Programada: ${dataProgFormatada}\n`;}
+        corpoEmail += `Tipo de Solicitação: ${h.tipo_sol || 'OSM'}\n`;
+        corpoEmail += `Centro Operacional: Centro ${h.centro || '---'}\n`;
+        corpoEmail += `Processo: ${h.processo || '---'}\n`;
+        
+        corpoEmail += `Movimentação: ${h.movim || '---'}\n`;
+        if (h.tipo_sol === "Programada") { corpoEmail += `Data de Execução Programada: ${dataProgFormatada}\n`; }
           
         corpoEmail += `\n\nITENS SOLICITADOS:\n`;
         corpoEmail += `CODIGO - DESCRICAO - QUANTIDADE\n`;
@@ -1307,10 +1353,10 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
         const usarAplicativo = confirm("Deseja abrir no Aplicativo do Outlook?\n\n(Clique em 'Cancelar' para abrir o Outlook Web)");
 
         if (usarAplicativo) {
-            const mailtoUrl = `mailto:?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
+            const mailtoUrl = `mailto:${encodeURIComponent(DESTINATARIOS_PADRAO)}?cc=${encodeURIComponent(COPIA_PADRAO)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
             window.location.href = mailtoUrl;
         } else {
-            const urlOutlookWeb = `https://outlook.office.com/mail/deeplink/compose?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
+            const urlOutlookWeb = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(DESTINATARIOS_PADRAO)}&cc=${encodeURIComponent(COPIA_PADRAO)}&subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
             window.open(urlOutlookWeb, '_blank');
         }
     }
@@ -1418,11 +1464,12 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
             if (d.tipo_sol) document.getElementById('tipo_sol_fake').value = d.tipo_sol;
             if (d.data_prog) document.getElementById('data_programada').value = d.data_prog;
             if (d.processo) document.getElementById('processo').value = d.processo;
-            if (d.mat_adm) document.getElementById('mat_adm').value = d.mat_adm;
+            if (d.mat_adm) document.getElementById('mat_adm').checked = (d.mat_adm === "Sim");
+            if (d.is_kit) document.getElementById('is_kit_option').checked = (d.is_kit === "Sim");
             if (d.movimentacao) document.getElementById('movimentacao').value = d.movimentacao;
             
             if (d.reserva) {
-                document.getElementById('reserva').value = d.reserva;
+                document.getElementById('reserva').checked = (d.reserva === "Sim");
                 if (d.reserva === "Sim") {
                     if(d.id_fluxo) document.getElementById('id_fluxo').value = d.id_fluxo;
                     if(d.reserva_num) document.getElementById('reserva_num').value = d.reserva_num;
@@ -1437,39 +1484,41 @@ Se a exclusão on-line falhar, a edição será cancelada para evitar duplicidad
             localStorage.removeItem('fast_request_draft'); 
             location.reload(); 
         } 
-    }document.addEventListener("DOMContentLoaded", function() {
-    const infoCripto = "QXBsaWNhdGl2byBkZXNlbnZvbHZpZG8gcG9yIExlaWNsZXIgTWFydmlt";
-    const textoOriginal = atob(infoCripto);
-    
-    const rodape = document.createElement("div");
-    rodape.id = "sistema_copyright_protegido";
-    rodape.style.cssText = "text-align:center; padding:12px; font-size:11px; color:#777; background:#ffffff; border-top:1px solid #ddd; font-weight:bold; font-style:italic; opacity:0.55; position:relative; z-index:9999; font-family:'Segoe UI', sans-serif;";
-    rodape.innerText = textoOriginal;
-    
-    const appContainer = document.querySelector(".app") || document.body;
-    appContainer.appendChild(rodape);
+    }
 
-    setInterval(function() {
-        const elemento = document.getElementById("sistema_copyright_protegido");
+    document.addEventListener("DOMContentLoaded", function() {
+        const infoCripto = "QXBsaWNhdGl2byBkZXNlbnZvbHZpZG8gcG9yIExlaWNsZXIgTWFydmlt";
+        const textoOriginal = atob(infoCripto);
         
-        if (!elemento || 
-            elemento.style.display === "none" || 
-            elemento.style.visibility === "hidden" || 
-            elemento.innerText.trim() !== textoOriginal) {
+        const rodape = document.createElement("div");
+        rodape.id = "sistema_copyright_protegido";
+        rodape.style.cssText = "text-align:center; padding:12px; font-size:11px; color:#777; background:#ffffff; border-top:1px solid #ddd; font-weight:bold; font-style:italic; opacity:0.55; position:relative; z-index:9999; font-family:'Segoe UI', sans-serif;";
+        rodape.innerText = textoOriginal;
+        
+        const appContainer = document.querySelector(".app") || document.body;
+        appContainer.appendChild(rodape);
+
+        setInterval(function() {
+            const elemento = document.getElementById("sistema_copyright_protegido");
             
-            document.body.innerHTML = `
-                <div style="color:#d9534f; text-align:center; margin-top:100px; font-family:'Segoe UI', sans-serif; padding:20px;">
-                    <span style="font-size:50px;">⚠️</span>
-                    <h2 style="margin-top:10px;">Erro Crítico de Integridade</h2>
-                    <p style="color:#333;">A licença de uso ou o código original deste aplicativo foi violado/adulterado.</p>
-                    <p style="font-size:13px; color:#666;">Por favor, utilize a versão oficial disponibilizada pelo desenvolvedor.</p>
-                </div>
-            `;
-            
-            throw new Error("Aplicação violada. Execução interrompida.");
-        }
-    }, 2500);
-});
+            if (!elemento || 
+                elemento.style.display === "none" || 
+                elemento.style.visibility === "hidden" || 
+                elemento.innerText.trim() !== textoOriginal) {
+                
+                document.body.innerHTML = `
+                    <div style="color:#d9534f; text-align:center; margin-top:100px; font-family:'Segoe UI', sans-serif; padding:20px;">
+                        <span style="font-size:50px;">⚠️</span>
+                        <h2 style="margin-top:10px;">Erro Crítico de Integridade</h2>
+                        <p style="color:#333;">A licença de uso ou o código original deste aplicativo foi violado/adulterado.</p>
+                        <p style="font-size:13px; color:#666;">Por favor, utilize a versão oficial disponibilizada pelo desenvolvedor.</p>
+                    </div>
+                `;
+                
+                throw new Error("Aplicação violada. Execução interrompida.");
+            }
+        }, 2500);
+    });
 </script>
 </body>
 </html>
